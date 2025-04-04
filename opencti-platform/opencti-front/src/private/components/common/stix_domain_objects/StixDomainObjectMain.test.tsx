@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
-import { Route } from 'react-router-dom';
+import { Route } from 'react-router';
 import testRender from '../../../../utils/tests/test-render';
 import StixDomainObjectMain from './StixDomainObjectMain';
 import { StixDomainObjectTabsBoxTab } from './StixDomainObjectTabsBox';
