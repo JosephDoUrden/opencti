@@ -82,6 +82,6 @@ interface AuthContext {
   synchronizedUpsert?: boolean;
   previousStandard?: string;
   req?: Express.Request;
-  synchronizedUpsert?: boolean;
+  requestAbortSignal?: AbortSignal;
   blocked_for_lts_validation?: boolean;
 }
