@@ -10467,6 +10467,7 @@ type Mutation {
   workflowDefinitionSet(entityType: String!, definition: String!): EntitySetting
   workflowDefinitionDelete(entityType: String!): EntitySetting
   triggerWorkflowEvent(entityId: String!, eventName: String!): WorkflowTriggerResult!
+  resolvePendingWorkflowTransition(entityId: String!, success: Boolean!, reason: String): WorkflowTriggerResult!
   channelAdd(input: ChannelAddInput!): Channel
   channelDelete(id: ID!): ID
   channelFieldPatch(id: ID!, input: [EditInput]!, commitMessage: String, references: [String]): Channel
@@ -10840,9 +10841,27 @@ type WorkflowTriggerResult {
   success: Boolean!
   newState: String
   reason: String
+  executionStatus: WorkflowExecutionStatus
+  pendingTransition: WorkflowPendingTransition
   status: Status
   instance: WorkflowInstance
   entity: BasicObject
+}
+
+enum WorkflowExecutionStatus {
+  success
+  pending
+  failed
+}
+
+type WorkflowPendingTransition {
+  id: ID!
+  event: String!
+  fromState: String!
+  toState: String!
+  startedAt: String!
+  taskId: String
+  workId: String
 }
 
 type WorkflowTransition {
@@ -10856,6 +10875,9 @@ type WorkflowInstance {
   id: ID!
   currentState: String!
   currentStatus: Status
+  pendingStatus: WorkflowExecutionStatus
+  pendingError: String
+  pendingTransition: WorkflowPendingTransition
   allowedTransitions: [WorkflowTransition!]!
 }
 

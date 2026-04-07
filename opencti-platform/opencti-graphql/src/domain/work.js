@@ -15,6 +15,7 @@ import { RELATION_OBJECT_MARKING } from '../schema/stixRefRelationship';
 import { DRAFT_VALIDATION_CONNECTOR, DRAFT_VALIDATION_CONNECTOR_ID } from '../modules/draftWorkspace/draftWorkspace-connector';
 import { logApp } from '../config/conf';
 import { internalLoadById } from '../database/middleware-loader';
+import { resolvePendingWorkflowTransitionByWorkId } from '../modules/workflow/domain/workflow-domain';
 
 export const workToExportFile = (work) => {
   const lastModifiedSinceMin = sinceNowInMinutes(work.updated_at);
@@ -290,6 +291,10 @@ export const reportExpectation = async (context, user, workId, errorData) => {
       // If work is associated to a task, we also need to update work to completed on the task
       if (isComplete) {
         await updateWorkTaskToComplete(context, user, currentWork);
+        const finalizedWork = await loadWorkById(context, user, workId);
+        const hasErrors = (finalizedWork?.errors?.length ?? 0) > 0;
+        const failureReason = hasErrors ? (finalizedWork?.errors?.[0]?.message || 'Background work failed') : undefined;
+        await resolvePendingWorkflowTransitionByWorkId(context, user, workId, !hasErrors, failureReason);
       }
     } else {
       logApp.warn('The work cannot be found in database, report expectation cannot be updated.', { workId });
@@ -388,6 +393,16 @@ export const updateProcessedTime = async (context, user, workId, message, inErro
   }
   // Update elastic
   await elUpdate(currentWork._index, workId, { script: { source, lang: 'painless', params } });
+  // Ensure task and workflow transition states are aligned when work reaches completion through processed events.
+  if (currentWork.import_expected_number === 0 || isComplete) {
+    const finalizedWork = await loadWorkById(context, user, workId);
+    if (finalizedWork) {
+      await updateWorkTaskToComplete(context, user, finalizedWork);
+      const hasErrors = (finalizedWork.errors?.length ?? 0) > 0;
+      const failureReason = hasErrors ? (finalizedWork.errors?.[0]?.message || message || 'Background work failed') : undefined;
+      await resolvePendingWorkflowTransitionByWorkId(context, user, workId, !hasErrors, failureReason);
+    }
+  }
   // Remove redis work if needed
   if (isComplete) {
     await redisDeleteWorks([workId]);

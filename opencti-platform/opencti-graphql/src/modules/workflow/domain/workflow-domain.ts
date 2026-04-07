@@ -17,9 +17,11 @@ import type { BasicStoreEntity } from '../../../types/store';
 import { bypassDraftContext } from '../../../utils/draftContext';
 
 interface WorkflowInstanceStoreEntity extends BasicStoreEntity {
+  entity_id: string;
   currentState: string;
   history: string;
   pending_status?: string;
+  pending_work_id?: string;
   pending_transition?: string;
   pending_error?: string;
 }
@@ -40,6 +42,15 @@ const parsePendingTransition = (instanceEntity?: WorkflowInstanceStoreEntity | n
     return null;
   }
 };
+
+const normalizePendingStatus = (status?: string | null): string | null => {
+  if (!status) {
+    return null;
+  }
+  return status.toLowerCase();
+};
+
+const isPendingStatus = (status?: string | null): boolean => normalizePendingStatus(status) === 'pending';
 
 const validateNoAsyncStateActions = (definitionObj: any) => {
   const states = definitionObj?.states ?? [];
@@ -250,10 +261,10 @@ export const getWorkflowInstance = async (
   const instanceEntity = await findWorkflowInstanceEntity(context, user, effectiveEntityId);
   const currentState = instanceEntity?.currentState ?? definitionData.initialState;
   const pendingTransition = parsePendingTransition(instanceEntity);
-  const pendingStatus = instanceEntity?.pending_status ?? null;
+  const pendingStatus = normalizePendingStatus(instanceEntity?.pending_status ?? null);
   const pendingError = instanceEntity?.pending_error ?? null;
 
-  const allowedTransitions = pendingStatus === 'PENDING'
+  const allowedTransitions = pendingStatus === 'pending'
     ? []
     : await getAllowedTransitions(context, user, entityId);
   const id = instanceEntity?.internal_id ?? instanceEntity?.id ?? `initial-${effectiveEntityId}`;
@@ -373,7 +384,7 @@ export const triggerWorkflowEvent = async (
       instanceEntity = await initializeWorkflowInstance(executionContext, executionUser, entity, entitySetting, definitionData);
     }
 
-    if (instanceEntity.pending_status === 'PENDING') {
+    if (isPendingStatus(instanceEntity.pending_status)) {
       const workflowInstance = await getWorkflowInstance(context, user, entityId);
       return {
         success: false,
@@ -447,7 +458,8 @@ export const triggerWorkflowEvent = async (
       };
       const instanceId = instanceEntity.internal_id || instanceEntity.id;
       await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
-        { key: 'pending_status', value: ['PENDING'] },
+        { key: 'pending_status', value: ['pending'] },
+        { key: 'pending_work_id', value: [pendingTransition.workId ?? null] },
         { key: 'pending_transition', value: [JSON.stringify(pendingTransition)] },
         { key: 'pending_error', value: [null] },
       ]);
@@ -483,6 +495,7 @@ export const triggerWorkflowEvent = async (
         { key: 'currentState', value: [newState] },
         { key: 'history', value: [JSON.stringify(history)] },
         { key: 'pending_status', value: [null] },
+        { key: 'pending_work_id', value: [null] },
         { key: 'pending_transition', value: [null] },
         { key: 'pending_error', value: [null] },
       ]);
@@ -517,7 +530,7 @@ export const resolvePendingWorkflowTransition = async (
   const executionUser = executionContext.user!;
   const effectiveEntityId = entity.internal_id || entity.id;
   const instanceEntity = await findWorkflowInstanceEntity(executionContext, executionUser, effectiveEntityId);
-  if (!instanceEntity || instanceEntity.pending_status !== 'PENDING') {
+  if (!instanceEntity || !isPendingStatus(instanceEntity.pending_status)) {
     return { success: false, executionStatus: 'failed', reason: 'No pending transition to resolve.', entity };
   }
 
@@ -530,7 +543,7 @@ export const resolvePendingWorkflowTransition = async (
   if (!success) {
     const failureReason = reason || 'Pending transition failed.';
     await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
-      { key: 'pending_status', value: ['FAILED'] },
+      { key: 'pending_status', value: ['failed'] },
       { key: 'pending_error', value: [failureReason] },
     ]);
     const workflowInstance = await getWorkflowInstance(context, user, entityId);
@@ -556,6 +569,7 @@ export const resolvePendingWorkflowTransition = async (
     { key: 'currentState', value: [pendingTransition.toState] },
     { key: 'history', value: [JSON.stringify(history)] },
     { key: 'pending_status', value: [null] },
+    { key: 'pending_work_id', value: [null] },
     { key: 'pending_transition', value: [null] },
     { key: 'pending_error', value: [null] },
   ]);
@@ -568,4 +582,36 @@ export const resolvePendingWorkflowTransition = async (
     instance: workflowInstance,
     entity,
   };
+};
+
+export const resolvePendingWorkflowTransitionByWorkId = async (
+  context: AuthContext,
+  user: AuthUser,
+  workId: string,
+  success: boolean,
+  reason?: string,
+): Promise<void> => {
+  const executionContext = bypassDraftContext(context);
+  const executionUser = executionContext.user!;
+  const pendingInstance = await loadEntity(executionContext, executionUser, [ENTITY_TYPE_WORKFLOW_INSTANCE], {
+    filters: {
+      mode: FilterMode.And,
+      filters: [
+        { key: ['pending_status'], values: ['pending'] },
+        { key: ['pending_work_id'], values: [workId] },
+      ],
+      filterGroups: [],
+    },
+  }) as WorkflowInstanceStoreEntity;
+
+  if (!pendingInstance) {
+    return;
+  }
+  await resolvePendingWorkflowTransition(
+    executionContext,
+    executionUser,
+    pendingInstance.entity_id,
+    success,
+    reason,
+  );
 };

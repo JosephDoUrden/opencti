@@ -21,6 +21,13 @@ export const workflowStatusFragment = graphql`
     workflowInstance {
       id
       currentState
+      pendingStatus
+      pendingError
+      pendingTransition {
+        id
+        event
+        toState
+      }
       currentStatus {
         id
         template {
@@ -50,9 +57,22 @@ const workflowStatusTriggerMutation = graphql`
       success
       reason
       newState
+      executionStatus
+      pendingTransition {
+        id
+        event
+        toState
+      }
       instance {
         id
         currentState
+        pendingStatus
+        pendingError
+        pendingTransition {
+          id
+          event
+          toState
+        }
         currentStatus {
           id
           template {
@@ -111,11 +131,19 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
   const { exitDraft } = useSwitchDraft();
   const [commit, approving] = useMutation<WorkflowStatusTriggerMutation>(workflowStatusTriggerMutation);
 
-  if (!draft.workflowInstance || draft.workflowInstance.allowedTransitions.length === 0) {
+  if (!draft.workflowInstance) {
     return null;
   }
 
   const { workflowInstance } = draft;
+  const pendingStatus = (workflowInstance as any).pendingStatus;
+  const pendingError = (workflowInstance as any).pendingError;
+  const isPending = pendingStatus === 'pending' || pendingStatus === 'PENDING';
+  const hasTransitions = workflowInstance.allowedTransitions.length > 0;
+
+  if (!isPending && !pendingError && !hasTransitions) {
+    return null;
+  }
 
   const handleOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -126,6 +154,9 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
   };
 
   const handleTransition = (eventName: string, actions: readonly string[]) => {
+    if (isPending) {
+      return;
+    }
     if (actions.includes('validateDraft')) {
       handleClose();
       setValidationTransition(eventName);
@@ -150,7 +181,8 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
           eventName: validationTransition,
         },
         onCompleted: (response) => {
-          if (response.triggerWorkflowEvent?.success) {
+          const executionStatus = (response.triggerWorkflowEvent as any)?.executionStatus;
+          if (response.triggerWorkflowEvent?.success && executionStatus !== 'pending') {
             setValidationTransition(null);
             MESSAGING$.notifySuccess(t_i18n('Draft validation in progress'));
             exitDraft({
@@ -162,6 +194,9 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
                 }
               },
             });
+          } else if (executionStatus === 'pending') {
+            setValidationTransition(null);
+            MESSAGING$.notifySuccess(t_i18n('Workflow transition started and is pending completion'));
           }
         },
       });
@@ -170,13 +205,26 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
 
   return (
     <>
-      <Button
-        variant="secondary"
-        onClick={handleOpen}
-        endIcon={<ArrowDropDownOutlined />}
-      >
-        {t_i18n('Workflow')}
-      </Button>
+      {hasTransitions && (
+        <Button
+          variant="secondary"
+          onClick={handleOpen}
+          endIcon={<ArrowDropDownOutlined />}
+          disabled={isPending}
+        >
+          {t_i18n('Workflow')}
+        </Button>
+      )}
+      {isPending && (
+        <Alert sx={{ mt: 1, mb: 1 }} severity="info">
+          {t_i18n('A workflow transition is currently pending. Please wait for completion before triggering another transition.')}
+        </Alert>
+      )}
+      {!isPending && pendingError && (
+        <Alert sx={{ mt: 1, mb: 1 }} severity="error">
+          {pendingError}
+        </Alert>
+      )}
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClose}>
         {workflowInstance.allowedTransitions.map((transition) => (
           <MenuItem
