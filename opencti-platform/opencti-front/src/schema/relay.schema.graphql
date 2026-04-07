@@ -10776,6 +10776,22 @@ enum WorkflowActionMode {
   async
 }
 
+enum WorkflowExecutionStatus {
+  success
+  pending
+  failed
+}
+
+type WorkflowPendingTransition {
+  id: ID!
+  event: String!
+  fromState: String!
+  toState: String!
+  startedAt: String!
+  taskId: String
+  workId: String
+}
+
 type WorkflowActionConfig {
   type: String!
   params: JSON
@@ -10846,22 +10862,6 @@ type WorkflowTriggerResult {
   status: Status
   instance: WorkflowInstance
   entity: BasicObject
-}
-
-enum WorkflowExecutionStatus {
-  success
-  pending
-  failed
-}
-
-type WorkflowPendingTransition {
-  id: ID!
-  event: String!
-  fromState: String!
-  toState: String!
-  startedAt: String!
-  taskId: String
-  workId: String
 }
 
 type WorkflowTransition {

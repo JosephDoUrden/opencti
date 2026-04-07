@@ -110,6 +110,37 @@ describe('useWorkflowForm', () => {
       };
       expect(helpers.setFieldValue).toHaveBeenCalledWith(WorkflowDataType.onEnter, [expectedAction]);
     });
+
+    it('should add an async org sharing action with default background task params', () => {
+      const node: Node = { id: '1', position: { x: 0, y: 0 }, data: {} };
+      const { result } = renderHook(() => useWorkflowForm(node, mockOnClose));
+      const helpers = createMockFormikHelpers();
+
+      act(() => {
+        result.current.onAddObject(
+          WorkflowDataType.actions,
+          WorkflowActionType.backgroundListTask,
+          helpers.setFieldValue,
+          mockValues,
+        );
+      });
+
+      const expectedAction: Action = {
+        type: WorkflowActionType.backgroundListTask,
+        mode: 'async',
+        params: {
+          scope: 'KNOWLEDGE',
+          description: 'Workflow org sharing',
+          actions: [{
+            type: 'share',
+            context: {
+              values: [],
+            },
+          }],
+        },
+      };
+      expect(helpers.setFieldValue).toHaveBeenCalledWith(WorkflowDataType.actions, [expectedAction]);
+    });
   });
 
   describe('Handlers (onSubmit & onDelete)', () => {

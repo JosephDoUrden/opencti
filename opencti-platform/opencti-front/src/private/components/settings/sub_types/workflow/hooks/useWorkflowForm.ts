@@ -54,9 +54,26 @@ export const useWorkflowForm = (selectedElement: Node | Edge, onClose: () => voi
     if (type === WorkflowDataType.conditions) {
       newItem = { field: '', operator: 'eq', value: '' };
     } else {
-      newItem = actionName === WorkflowActionType.updateAuthorizedMembers
-        ? { type: actionName, params: { authorized_members: [] } }
-        : { type: actionName };
+      if (actionName === WorkflowActionType.updateAuthorizedMembers) {
+        newItem = { type: actionName, params: { authorized_members: [] } };
+      } else if (actionName === WorkflowActionType.backgroundListTask) {
+        newItem = {
+          type: actionName,
+          mode: 'async',
+          params: {
+            scope: 'KNOWLEDGE',
+            description: 'Workflow org sharing',
+            actions: [{
+              type: 'share',
+              context: {
+                values: [],
+              },
+            }],
+          },
+        };
+      } else {
+        newItem = { type: actionName };
+      }
     }
 
     const currentList = values[type] || [];

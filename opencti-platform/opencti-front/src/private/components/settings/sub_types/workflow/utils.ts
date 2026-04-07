@@ -46,6 +46,7 @@ export enum WorkflowDataType {
 export enum WorkflowActionType {
   updateAuthorizedMembers = 'updateAuthorizedMembers',
   validateDraft = 'validateDraft',
+  backgroundListTask = 'backgroundListTask',
 }
 
 export const NODE_SIZE = { width: 160, height: 50 };
@@ -66,6 +67,32 @@ const formatActions = (actions: Action[] = []) => {
         mode,
       };
     }
+    if (type === 'backgroundListTask') {
+      const selectedOrganizations = (params as {
+        actions?: { context?: { values?: { value: string; label: string }[] } }[];
+        scope?: string;
+        description?: string;
+      })?.actions?.[0]?.context?.values ?? [];
+      return {
+        type,
+        mode: 'async',
+        params: {
+          scope: (params as { scope?: string })?.scope ?? 'KNOWLEDGE',
+          description: (params as { description?: string })?.description ?? 'Workflow org sharing',
+          actions: [{
+            type: 'share',
+            context: {
+              values: selectedOrganizations.map((organization) => organization.value),
+            },
+          }],
+        },
+      };
+    }
+    return {
+      type,
+      mode,
+      params,
+    };
   });
 };
 

@@ -57,6 +57,22 @@ export const useWorkflowInitialElements = (
             },
           };
         }
+        if (action.type === 'backgroundListTask') {
+          const organizationIds = (action?.params as { actions?: { context?: { values?: string[] } }[] })
+            ?.actions?.[0]?.context?.values ?? [];
+          return {
+            ...action,
+            params: {
+              ...(action?.params ?? {}),
+              actions: [{
+                type: 'share',
+                context: {
+                  values: organizationIds.map((id) => ({ value: id, label: id })),
+                },
+              }],
+            },
+          } as Action;
+        }
         return action as Action;
       });
     };

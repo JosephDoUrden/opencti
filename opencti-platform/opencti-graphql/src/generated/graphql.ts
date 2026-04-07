@@ -17121,6 +17121,7 @@ export type Mutation = {
   requestAccessConfigure?: Maybe<RequestAccessConfiguration>;
   resetFileIndexing?: Maybe<Scalars['Boolean']['output']>;
   resetStateConnector?: Maybe<Connector>;
+  resolvePendingWorkflowTransition: WorkflowTriggerResult;
   retentionRuleAdd: RetentionRule;
   retentionRuleCheck: Scalars['Int']['output'];
   retentionRuleEdit?: Maybe<RetentionRuleEditMutations>;
@@ -19001,6 +19002,13 @@ export type MutationRequestAccessConfigureArgs = {
 
 export type MutationResetStateConnectorArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type MutationResolvePendingWorkflowTransitionArgs = {
+  entityId: Scalars['String']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  success: Scalars['Boolean']['input'];
 };
 
 
@@ -37540,12 +37548,32 @@ export type WorkflowConditionConfig = {
   value?: Maybe<Scalars['String']['output']>;
 };
 
+export enum WorkflowExecutionStatus {
+  Failed = 'failed',
+  Pending = 'pending',
+  Success = 'success'
+}
+
 export type WorkflowInstance = {
   __typename?: 'WorkflowInstance';
   allowedTransitions: Array<WorkflowTransition>;
   currentState: Scalars['String']['output'];
   currentStatus?: Maybe<Status>;
   id: Scalars['ID']['output'];
+  pendingError?: Maybe<Scalars['String']['output']>;
+  pendingStatus?: Maybe<WorkflowExecutionStatus>;
+  pendingTransition?: Maybe<WorkflowPendingTransition>;
+};
+
+export type WorkflowPendingTransition = {
+  __typename?: 'WorkflowPendingTransition';
+  event: Scalars['String']['output'];
+  fromState: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  startedAt: Scalars['String']['output'];
+  taskId?: Maybe<Scalars['String']['output']>;
+  toState: Scalars['String']['output'];
+  workId?: Maybe<Scalars['String']['output']>;
 };
 
 export type WorkflowSchema = {
@@ -37584,8 +37612,10 @@ export type WorkflowTransition = {
 export type WorkflowTriggerResult = {
   __typename?: 'WorkflowTriggerResult';
   entity?: Maybe<BasicObject>;
+  executionStatus?: Maybe<WorkflowExecutionStatus>;
   instance?: Maybe<WorkflowInstance>;
   newState?: Maybe<Scalars['String']['output']>;
+  pendingTransition?: Maybe<WorkflowPendingTransition>;
   reason?: Maybe<Scalars['String']['output']>;
   status?: Maybe<Status>;
   success: Scalars['Boolean']['output'];
@@ -39911,7 +39941,9 @@ export type ResolversTypes = ResolversObject<{
   WorkflowActionConfig: ResolverTypeWrapper<WorkflowActionConfig>;
   WorkflowActionMode: WorkflowActionMode;
   WorkflowConditionConfig: ResolverTypeWrapper<WorkflowConditionConfig>;
+  WorkflowExecutionStatus: WorkflowExecutionStatus;
   WorkflowInstance: ResolverTypeWrapper<Omit<WorkflowInstance, 'allowedTransitions' | 'currentStatus'> & { allowedTransitions: Array<ResolversTypes['WorkflowTransition']>, currentStatus?: Maybe<ResolversTypes['Status']> }>;
+  WorkflowPendingTransition: ResolverTypeWrapper<WorkflowPendingTransition>;
   WorkflowSchema: ResolverTypeWrapper<WorkflowSchema>;
   WorkflowSerializedState: ResolverTypeWrapper<WorkflowSerializedState>;
   WorkflowSerializedTransition: ResolverTypeWrapper<WorkflowSerializedTransition>;
@@ -40868,6 +40900,7 @@ export type ResolversParentTypes = ResolversObject<{
   WorkflowActionConfig: WorkflowActionConfig;
   WorkflowConditionConfig: WorkflowConditionConfig;
   WorkflowInstance: Omit<WorkflowInstance, 'allowedTransitions' | 'currentStatus'> & { allowedTransitions: Array<ResolversParentTypes['WorkflowTransition']>, currentStatus?: Maybe<ResolversParentTypes['Status']> };
+  WorkflowPendingTransition: WorkflowPendingTransition;
   WorkflowSchema: WorkflowSchema;
   WorkflowSerializedState: WorkflowSerializedState;
   WorkflowSerializedTransition: WorkflowSerializedTransition;
@@ -46861,6 +46894,7 @@ export type MutationResolvers<ContextType = any, ParentType extends ResolversPar
   requestAccessConfigure?: Resolver<Maybe<ResolversTypes['RequestAccessConfiguration']>, ParentType, ContextType, RequireFields<MutationRequestAccessConfigureArgs, 'input'>>;
   resetFileIndexing?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
   resetStateConnector?: Resolver<Maybe<ResolversTypes['Connector']>, ParentType, ContextType, RequireFields<MutationResetStateConnectorArgs, 'id'>>;
+  resolvePendingWorkflowTransition?: Resolver<ResolversTypes['WorkflowTriggerResult'], ParentType, ContextType, RequireFields<MutationResolvePendingWorkflowTransitionArgs, 'entityId' | 'success'>>;
   retentionRuleAdd?: Resolver<ResolversTypes['RetentionRule'], ParentType, ContextType, RequireFields<MutationRetentionRuleAddArgs, 'input'>>;
   retentionRuleCheck?: Resolver<ResolversTypes['Int'], ParentType, ContextType, Partial<MutationRetentionRuleCheckArgs>>;
   retentionRuleEdit?: Resolver<Maybe<ResolversTypes['RetentionRuleEditMutations']>, ParentType, ContextType, RequireFields<MutationRetentionRuleEditArgs, 'id'>>;
@@ -52082,6 +52116,19 @@ export type WorkflowInstanceResolvers<ContextType = any, ParentType extends Reso
   currentState?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   currentStatus?: Resolver<Maybe<ResolversTypes['Status']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  pendingError?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  pendingStatus?: Resolver<Maybe<ResolversTypes['WorkflowExecutionStatus']>, ParentType, ContextType>;
+  pendingTransition?: Resolver<Maybe<ResolversTypes['WorkflowPendingTransition']>, ParentType, ContextType>;
+}>;
+
+export type WorkflowPendingTransitionResolvers<ContextType = any, ParentType extends ResolversParentTypes['WorkflowPendingTransition'] = ResolversParentTypes['WorkflowPendingTransition']> = ResolversObject<{
+  event?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  fromState?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  startedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  taskId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  toState?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  workId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
 }>;
 
 export type WorkflowSchemaResolvers<ContextType = any, ParentType extends ResolversParentTypes['WorkflowSchema'] = ResolversParentTypes['WorkflowSchema']> = ResolversObject<{
@@ -52115,8 +52162,10 @@ export type WorkflowTransitionResolvers<ContextType = any, ParentType extends Re
 
 export type WorkflowTriggerResultResolvers<ContextType = any, ParentType extends ResolversParentTypes['WorkflowTriggerResult'] = ResolversParentTypes['WorkflowTriggerResult']> = ResolversObject<{
   entity?: Resolver<Maybe<ResolversTypes['BasicObject']>, ParentType, ContextType>;
+  executionStatus?: Resolver<Maybe<ResolversTypes['WorkflowExecutionStatus']>, ParentType, ContextType>;
   instance?: Resolver<Maybe<ResolversTypes['WorkflowInstance']>, ParentType, ContextType>;
   newState?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  pendingTransition?: Resolver<Maybe<ResolversTypes['WorkflowPendingTransition']>, ParentType, ContextType>;
   reason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   status?: Resolver<Maybe<ResolversTypes['Status']>, ParentType, ContextType>;
   success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
@@ -52929,6 +52978,7 @@ export type Resolvers<ContextType = any> = ResolversObject<{
   WorkflowActionConfig?: WorkflowActionConfigResolvers<ContextType>;
   WorkflowConditionConfig?: WorkflowConditionConfigResolvers<ContextType>;
   WorkflowInstance?: WorkflowInstanceResolvers<ContextType>;
+  WorkflowPendingTransition?: WorkflowPendingTransitionResolvers<ContextType>;
   WorkflowSchema?: WorkflowSchemaResolvers<ContextType>;
   WorkflowSerializedState?: WorkflowSerializedStateResolvers<ContextType>;
   WorkflowSerializedTransition?: WorkflowSerializedTransitionResolvers<ContextType>;

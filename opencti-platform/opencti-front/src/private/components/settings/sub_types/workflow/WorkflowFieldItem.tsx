@@ -8,6 +8,7 @@ import useDeletion from '../../../../../utils/hooks/useDeletion';
 import AuthorizedMembersField from '@components/common/form/AuthorizedMembersField';
 import { camelCaseToSentenceCase } from '../../../../../utils/String';
 import { useFormatter } from '../../../../../components/i18n';
+import ObjectOrganizationField from '../../../common/form/ObjectOrganizationField';
 
 interface WorkflowFieldItemProps extends FieldProps {
   onDelete: () => void;
@@ -47,9 +48,23 @@ const WorkflowFieldItem = ({ field, onDelete }: WorkflowFieldItemProps) => {
               <Field component={TextField} name={`${name}.value`} label={t_i18n('Value')} variant="standard" fullWidth />
             </div>
           ) : (
-            value.type === 'updateAuthorizedMembers' && (
-              <Field name={`${name}.params.authorized_members`} component={AuthorizedMembersField} showAllMembersLine canDeactivate={false} enableAccesses hideInfo addMeUserWithAdminRights />
-            )
+            <>
+              {value.type === 'updateAuthorizedMembers' && (
+                <Field name={`${name}.params.authorized_members`} component={AuthorizedMembersField} showAllMembersLine canDeactivate={false} enableAccesses hideInfo addMeUserWithAdminRights />
+              )}
+              {value.type === 'backgroundListTask' && (
+                <>
+                  <Field component={TextField} name={`${name}.params.description`} label={t_i18n('Description')} variant="standard" fullWidth />
+                  <ObjectOrganizationField
+                    name={`${name}.params.actions[0].context.values`}
+                    label={t_i18n('Organizations')}
+                    multiple={true}
+                    alert={false}
+                    outlined={false}
+                  />
+                </>
+              )}
+            </>
           )}
         </AccordionDetails>
       </Accordion>
