@@ -3,6 +3,22 @@ enum WorkflowActionMode {
   async
 }
 
+enum WorkflowExecutionStatus {
+    success
+    pending
+    failed
+}
+
+type WorkflowPendingTransition {
+        id: ID!
+        event: String!
+        fromState: String!
+        toState: String!
+        startedAt: String!
+        taskId: String
+        workId: String
+}
+
 type WorkflowActionConfig {
     type: String!
     params: JSON
@@ -47,6 +63,8 @@ type WorkflowTriggerResult {
     success: Boolean!
     newState: String
     reason: String
+    executionStatus: WorkflowExecutionStatus
+    pendingTransition: WorkflowPendingTransition
     status: Status
     instance: WorkflowInstance
     entity: BasicObject
@@ -63,6 +81,9 @@ type WorkflowInstance {
     id: ID!
     currentState: String!
     currentStatus: Status
+    pendingStatus: WorkflowExecutionStatus
+    pendingError: String
+    pendingTransition: WorkflowPendingTransition
     allowedTransitions: [WorkflowTransition!]!
 }
 
@@ -81,4 +102,5 @@ extend type Mutation {
     workflowDefinitionSet(entityType: String!, definition: String!): EntitySetting @auth(for: [SETTINGS_SETCUSTOMIZATION])
     workflowDefinitionDelete(entityType: String!): EntitySetting @auth(for: [SETTINGS_SETCUSTOMIZATION])
     triggerWorkflowEvent(entityId: String!, eventName: String!): WorkflowTriggerResult! @auth(for: [KNOWLEDGE_KNUPDATE])
+    resolvePendingWorkflowTransition(entityId: String!, success: Boolean!, reason: String): WorkflowTriggerResult! @auth(for: [KNOWLEDGE_KNUPDATE])
 }

@@ -10,6 +10,23 @@ export const isEntityStatusTemplate
 export const ENTITY_TYPE_WORKFLOW_DEFINITION = 'WorkflowDefinition';
 export const ENTITY_TYPE_WORKFLOW_INSTANCE = 'WorkflowInstance';
 
+export type WorkflowExecutionStatus = 'success' | 'pending' | 'failed';
+
+export interface WorkflowPendingTransition {
+  id: string;
+  event: string;
+  fromState: string;
+  toState: string;
+  startedAt: string;
+  taskId?: string;
+  workId?: string;
+}
+
+export interface AsyncActionResult {
+  taskId?: string;
+  workId?: string;
+}
+
 /**
  * Execution Engine Types
  */
@@ -89,6 +106,8 @@ export interface TriggerResult {
   success: boolean;
   reason?: string;
   newState?: string;
+  executionStatus?: WorkflowExecutionStatus;
+  pendingTransition?: WorkflowPendingTransition;
   status?: any;
   instance?: any;
   entity?: any;

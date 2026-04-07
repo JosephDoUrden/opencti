@@ -5,6 +5,7 @@ import {
   getAllowedTransitions,
   getWorkflowDefinition,
   getWorkflowInstance,
+  resolvePendingWorkflowTransition,
   setWorkflowDefinition,
   triggerWorkflowEvent,
 } from '../domain/workflow-domain';
@@ -35,11 +36,21 @@ const workflowResolvers = {
     triggerWorkflowEvent: (_: any, { entityId, eventName }: { entityId: string; eventName: string }, context: AuthContext) => {
       return triggerWorkflowEvent(context, context.user!, entityId, eventName);
     },
+    resolvePendingWorkflowTransition: (
+      _: any,
+      { entityId, success, reason }: { entityId: string; success: boolean; reason?: string },
+      context: AuthContext,
+    ) => {
+      return resolvePendingWorkflowTransition(context, context.user!, entityId, success, reason);
+    },
   },
   WorkflowInstance: {
     id: (instance: any) => instance.id || instance.internal_id,
     currentState: (instance: any) => instance.currentState,
     currentStatus: (instance: any) => ({ id: instance.currentState, template_id: instance.currentState }),
+    pendingStatus: (instance: any) => instance.pendingStatus,
+    pendingError: (instance: any) => instance.pendingError,
+    pendingTransition: (instance: any) => instance.pendingTransition,
     allowedTransitions: (instance: any) => instance.allowedTransitions,
   },
   WorkflowTransition: {
@@ -48,6 +59,8 @@ const workflowResolvers = {
   },
   WorkflowTriggerResult: {
     status: (result: any) => (result.newState ? { id: result.newState, template_id: result.newState } : null),
+    executionStatus: (result: any) => result.executionStatus,
+    pendingTransition: (result: any) => result.pendingTransition,
     instance: (result: any) => result.instance,
     entity: (result: any) => result.entity,
   },

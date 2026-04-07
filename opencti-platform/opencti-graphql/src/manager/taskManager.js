@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import { v4 as uuidv4 } from 'uuid';
 import { clearIntervalAsync, setIntervalAsync } from 'set-interval-async/dynamic';
 import * as R from 'ramda';
@@ -128,7 +127,7 @@ export const taskList = async (context, user, task, callback) => {
     includeDeletedInDraft: true,
   };
   const elements = await internalFindByIds(context, user, ids, options);
-  callback(elements);
+  await callback(elements);
 };
 
 const throwErrorInDraftContext = (context, user, actionType) => {

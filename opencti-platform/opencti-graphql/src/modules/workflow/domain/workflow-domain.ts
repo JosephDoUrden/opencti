@@ -6,14 +6,68 @@ import { RELATION_HAS_WORKFLOW } from '../../../schema/internalRelationship';
 import type { AuthContext, AuthUser } from '../../../types/user';
 import { findByType as findEntitySettingByType } from '../../entitySetting/entitySetting-domain';
 import { WorkflowFactory } from '../engine/workflow-factory';
-import { ENTITY_TYPE_WORKFLOW_DEFINITION, ENTITY_TYPE_WORKFLOW_INSTANCE, type TriggerResult } from '../types/workflow-types';
+import { ActionRegistry } from '../registry/workflow-actions';
+import {
+  ENTITY_TYPE_WORKFLOW_DEFINITION,
+  ENTITY_TYPE_WORKFLOW_INSTANCE,
+  type TriggerResult,
+  type WorkflowPendingTransition,
+} from '../types/workflow-types';
 import type { BasicStoreEntity } from '../../../types/store';
 import { bypassDraftContext } from '../../../utils/draftContext';
 
 interface WorkflowInstanceStoreEntity extends BasicStoreEntity {
   currentState: string;
   history: string;
+  pending_status?: string;
+  pending_transition?: string;
+  pending_error?: string;
 }
+
+const parsePendingTransition = (instanceEntity?: WorkflowInstanceStoreEntity | null): WorkflowPendingTransition | null => {
+  if (!instanceEntity?.pending_transition) {
+    return null;
+  }
+  try {
+    const pendingTransition = typeof instanceEntity.pending_transition === 'string'
+      ? JSON.parse(instanceEntity.pending_transition)
+      : instanceEntity.pending_transition;
+    if (!pendingTransition?.id || !pendingTransition?.event || !pendingTransition?.fromState || !pendingTransition?.toState) {
+      return null;
+    }
+    return pendingTransition;
+  } catch {
+    return null;
+  }
+};
+
+const validateNoAsyncStateActions = (definitionObj: any) => {
+  const states = definitionObj?.states ?? [];
+  for (let index = 0; index < states.length; index += 1) {
+    const state = states[index];
+    const hasAsyncOnEnter = (state?.onEnter ?? []).some((a: any) => a?.mode === 'async');
+    const hasAsyncOnExit = (state?.onExit ?? []).some((a: any) => a?.mode === 'async');
+    if (hasAsyncOnEnter || hasAsyncOnExit) {
+      throw FunctionalError('Async actions are only supported on transitions.');
+    }
+  }
+};
+
+const validateTransitionAsyncActions = (definitionObj: any) => {
+  const transitions = definitionObj?.transitions ?? [];
+  for (let index = 0; index < transitions.length; index += 1) {
+    const transition = transitions[index];
+    const actions = transition?.actions ?? [];
+    const asyncActions = actions.filter((a: any) => a?.mode === 'async');
+    const syncActions = actions.filter((a: any) => a?.mode !== 'async');
+    if (asyncActions.length > 1) {
+      throw FunctionalError('Only one async action is supported per transition for now.');
+    }
+    if (asyncActions.length > 0 && syncActions.length > 0) {
+      throw FunctionalError('Mixing sync and async actions in the same transition is not supported.');
+    }
+  }
+};
 
 const getWorkflowConfig = async (context: AuthContext, user: AuthUser, targetType: string) => {
   const executionContext = bypassDraftContext(context);
@@ -120,6 +174,9 @@ export const setWorkflowDefinition = async (
     throw FunctionalError('Invalid workflow definition JSON');
   }
 
+  validateNoAsyncStateActions(definitionObj);
+  validateTransitionAsyncActions(definitionObj);
+
   const workflowName = definitionObj.name || `Workflow for ${entityType}`;
 
   const executionContext = bypassDraftContext(context);
@@ -192,14 +249,22 @@ export const getWorkflowInstance = async (
   const effectiveEntityId = entity.internal_id || entity.id;
   const instanceEntity = await findWorkflowInstanceEntity(context, user, effectiveEntityId);
   const currentState = instanceEntity?.currentState ?? definitionData.initialState;
+  const pendingTransition = parsePendingTransition(instanceEntity);
+  const pendingStatus = instanceEntity?.pending_status ?? null;
+  const pendingError = instanceEntity?.pending_error ?? null;
 
-  const allowedTransitions = await getAllowedTransitions(context, user, entityId);
+  const allowedTransitions = pendingStatus === 'PENDING'
+    ? []
+    : await getAllowedTransitions(context, user, entityId);
   const id = instanceEntity?.internal_id ?? instanceEntity?.id ?? `initial-${effectiveEntityId}`;
   return {
     id,
     internal_id: id,
     __typename: 'WorkflowInstance',
     currentState: currentState || '',
+    pendingStatus,
+    pendingError,
+    pendingTransition,
     allowedTransitions,
   };
 };
@@ -307,9 +372,95 @@ export const triggerWorkflowEvent = async (
     if (!instanceEntity) {
       instanceEntity = await initializeWorkflowInstance(executionContext, executionUser, entity, entitySetting, definitionData);
     }
+
+    if (instanceEntity.pending_status === 'PENDING') {
+      const workflowInstance = await getWorkflowInstance(context, user, entityId);
+      return {
+        success: false,
+        executionStatus: 'pending',
+        reason: 'A transition is already pending for this workflow instance.',
+        pendingTransition: parsePendingTransition(instanceEntity) ?? undefined,
+        instance: workflowInstance,
+        entity,
+      };
+    }
+
     const currentStateId = instanceEntity.currentState;
 
     const definition = WorkflowFactory.createDefinition(definitionData);
+    const transition = definition.getTransition(currentStateId || definition.getInitialState(), eventName);
+
+    if (!transition) {
+      return {
+        success: false,
+        reason: `No transition found from state '${currentStateId}' for event '${eventName}'`,
+        entity,
+      };
+    }
+
+    if (transition.conditions) {
+      for (const condition of transition.conditions) {
+        const isValid = await condition(workflowContext);
+        if (!isValid) {
+          return {
+            success: false,
+            reason: `Condition failed for transition '${eventName}'`,
+            entity,
+          };
+        }
+      }
+    }
+
+    const schemaTransition = definitionData.transitions.find((t: any) => t.from === transition.from
+      && t.to === transition.to
+      && t.event === transition.event);
+    const hasAsyncTransitionAction = (schemaTransition?.actions ?? []).some((a: any) => a?.mode === 'async');
+
+    if (hasAsyncTransitionAction) {
+      const asyncAction = (schemaTransition?.actions ?? []).find((a: any) => a?.mode === 'async');
+      if (!asyncAction) {
+        return {
+          success: false,
+          executionStatus: 'failed',
+          reason: `No async action configured for transition '${eventName}'.`,
+          entity,
+        };
+      }
+      const actionFn = ActionRegistry[asyncAction.type];
+      if (!actionFn) {
+        return {
+          success: false,
+          executionStatus: 'failed',
+          reason: `Action type '${asyncAction.type}' not found in registry.`,
+          entity,
+        };
+      }
+      const actionResult = await actionFn(workflowContext, asyncAction.params);
+      const pendingTransition: WorkflowPendingTransition = {
+        id: `${eventName}-${Date.now()}`,
+        event: eventName,
+        fromState: transition.from,
+        toState: transition.to,
+        startedAt: new Date().toISOString(),
+        taskId: actionResult && typeof actionResult === 'object' ? actionResult.taskId : undefined,
+        workId: actionResult && typeof actionResult === 'object' ? actionResult.workId : undefined,
+      };
+      const instanceId = instanceEntity.internal_id || instanceEntity.id;
+      await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+        { key: 'pending_status', value: ['PENDING'] },
+        { key: 'pending_transition', value: [JSON.stringify(pendingTransition)] },
+        { key: 'pending_error', value: [null] },
+      ]);
+
+      const workflowInstance = await getWorkflowInstance(context, user, entityId);
+      return {
+        success: true,
+        executionStatus: 'pending',
+        pendingTransition,
+        instance: workflowInstance,
+        entity,
+      };
+    }
 
     // 5. Create instance and Trigger the event
     const instance = WorkflowFactory.getInstance(definitionData, definition, currentStateId || '', workflowContext);
@@ -331,10 +482,13 @@ export const triggerWorkflowEvent = async (
       await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
         { key: 'currentState', value: [newState] },
         { key: 'history', value: [JSON.stringify(history)] },
+        { key: 'pending_status', value: [null] },
+        { key: 'pending_transition', value: [null] },
+        { key: 'pending_error', value: [null] },
       ]);
 
       const workflowInstance = await getWorkflowInstance(context, user, entityId);
-      return { success: true, newState, instance: workflowInstance, entity };
+      return { success: true, executionStatus: 'success', newState, instance: workflowInstance, entity };
     }
 
     return { ...result, entity };
@@ -345,4 +499,73 @@ export const triggerWorkflowEvent = async (
       reason: `Workflow execution failed: ${reason}`,
     };
   }
+};
+
+export const resolvePendingWorkflowTransition = async (
+  context: AuthContext,
+  user: AuthUser,
+  entityId: string,
+  success: boolean,
+  reason?: string,
+): Promise<TriggerResult> => {
+  const entity = await storeLoadById(context, user, entityId, 'Basic-Object');
+  if (!entity) {
+    throw FunctionalError('Entity not found', { entityId });
+  }
+
+  const executionContext = bypassDraftContext(context);
+  const executionUser = executionContext.user!;
+  const effectiveEntityId = entity.internal_id || entity.id;
+  const instanceEntity = await findWorkflowInstanceEntity(executionContext, executionUser, effectiveEntityId);
+  if (!instanceEntity || instanceEntity.pending_status !== 'PENDING') {
+    return { success: false, executionStatus: 'failed', reason: 'No pending transition to resolve.', entity };
+  }
+
+  const pendingTransition = parsePendingTransition(instanceEntity);
+  if (!pendingTransition) {
+    return { success: false, executionStatus: 'failed', reason: 'Pending transition payload is invalid.', entity };
+  }
+
+  const instanceId = instanceEntity.internal_id || instanceEntity.id;
+  if (!success) {
+    const failureReason = reason || 'Pending transition failed.';
+    await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+      { key: 'pending_status', value: ['FAILED'] },
+      { key: 'pending_error', value: [failureReason] },
+    ]);
+    const workflowInstance = await getWorkflowInstance(context, user, entityId);
+    return {
+      success: false,
+      executionStatus: 'failed',
+      reason: failureReason,
+      pendingTransition,
+      instance: workflowInstance,
+      entity,
+    };
+  }
+
+  const history = JSON.parse(instanceEntity.history || '[]');
+  history.push({
+    state: pendingTransition.toState,
+    user_id: user.id,
+    timestamp: new Date().toISOString(),
+    event: pendingTransition.event,
+  });
+
+  await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+    { key: 'currentState', value: [pendingTransition.toState] },
+    { key: 'history', value: [JSON.stringify(history)] },
+    { key: 'pending_status', value: [null] },
+    { key: 'pending_transition', value: [null] },
+    { key: 'pending_error', value: [null] },
+  ]);
+
+  const workflowInstance = await getWorkflowInstance(context, user, entityId);
+  return {
+    success: true,
+    executionStatus: 'success',
+    newState: pendingTransition.toState,
+    instance: workflowInstance,
+    entity,
+  };
 };
