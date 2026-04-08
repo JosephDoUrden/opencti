@@ -188,6 +188,9 @@ export const setWorkflowDefinition = async (
   validateNoAsyncStateActions(definitionObj);
   validateTransitionAsyncActions(definitionObj);
 
+  const transitions = definitionObj?.transitions ?? [];
+  const asyncTransitions = transitions.filter((transition: any) => (transition?.actions ?? []).some((action: any) => action?.mode === 'async'));
+
   const workflowName = definitionObj.name || `Workflow for ${entityType}`;
 
   const executionContext = bypassDraftContext(context);
@@ -351,15 +354,23 @@ export const triggerWorkflowEvent = async (
   entityId: string,
   eventName: string,
 ): Promise<TriggerResult> => {
+  // Bypass draft context for workflow state-machine persistence.
+  // Action execution keeps original context to preserve draft-aware behavior.
+  const executionContext = bypassDraftContext(context);
+  const executionUser = executionContext.user!;
+
   // 1. Fetch the entity
-  const entity = await storeLoadById(context, user, entityId, 'Basic-Object');
+  const entity = await storeLoadById(executionContext, executionUser, entityId, 'Basic-Object');
   if (!entity) {
     throw FunctionalError('Entity not found', { entityId });
   }
+  // Keep original context/user for action execution so draft-scoped actions
+  // (like org sharing from a draft) keep the same behavior as manual actions.
+  const actionEntity = await storeLoadById(context, user, entityId, 'Basic-Object') || entity;
 
   // 2. Fetch its EntitySetting to get the workflow configuration
-  const entitySetting = await getWorkflowConfig(context, user, entity.entity_type);
-  const definitionData = await getDefinitionData(context, user, entitySetting);
+  const entitySetting = await getWorkflowConfig(executionContext, executionUser, entity.entity_type);
+  const definitionData = await getDefinitionData(executionContext, executionUser, entitySetting);
 
   if (!definitionData) {
     return {
@@ -369,13 +380,15 @@ export const triggerWorkflowEvent = async (
   }
 
   try {
-    const executionContext = bypassDraftContext(context);
-    const executionUser = executionContext.user!;
-
     const workflowContext = {
       entity,
       user: executionUser,
       context: executionContext,
+    };
+    const workflowActionContext = {
+      entity: actionEntity,
+      user,
+      context,
     };
 
     const effectiveEntityId = entity.internal_id || entity.id;
@@ -385,7 +398,7 @@ export const triggerWorkflowEvent = async (
     }
 
     if (isPendingStatus(instanceEntity.pending_status)) {
-      const workflowInstance = await getWorkflowInstance(context, user, entityId);
+      const workflowInstance = await getWorkflowInstance(executionContext, executionUser, entityId);
       return {
         success: false,
         executionStatus: 'pending',
@@ -446,7 +459,7 @@ export const triggerWorkflowEvent = async (
           entity,
         };
       }
-      const actionResult = await actionFn(workflowContext, asyncAction.params);
+      const actionResult = await actionFn(workflowActionContext, asyncAction.params);
       const pendingTransition: WorkflowPendingTransition = {
         id: `${eventName}-${Date.now()}`,
         event: eventName,
@@ -464,7 +477,7 @@ export const triggerWorkflowEvent = async (
         { key: 'pending_error', value: [null] },
       ]);
 
-      const workflowInstance = await getWorkflowInstance(context, user, entityId);
+      const workflowInstance = await getWorkflowInstance(executionContext, executionUser, entityId);
       return {
         success: true,
         executionStatus: 'pending',
@@ -486,7 +499,7 @@ export const triggerWorkflowEvent = async (
       const history = JSON.parse(instanceEntity.history || '[]');
       history.push({
         state: newState,
-        user_id: user.id,
+        user_id: executionUser.id,
         timestamp: new Date().toISOString(),
         event: eventName,
       });
@@ -500,7 +513,7 @@ export const triggerWorkflowEvent = async (
         { key: 'pending_error', value: [null] },
       ]);
 
-      const workflowInstance = await getWorkflowInstance(context, user, entityId);
+      const workflowInstance = await getWorkflowInstance(executionContext, executionUser, entityId);
       return { success: true, executionStatus: 'success', newState, instance: workflowInstance, entity };
     }
 
