@@ -15012,7 +15012,6 @@ type Query {
 
   ######## STIX CORE OBJECT ENTITIES
 
-  stixCoreObjectCleanInconsistency(id: String!): String @auth(for: [KNOWLEDGE])
   stixCoreObjectRaw(id: String!): String @auth(for: [KNOWLEDGE])
   stixCoreObject(id: String!): StixCoreObject @auth(for: [KNOWLEDGE])
   stixCoreObjectAnalysis(id: ID!, contentSource: String!, contentType: AnalysisContentType!): Analysis @auth(for: [KNOWLEDGE])
@@ -16130,6 +16129,12 @@ type MappedEntity {
   isEntityInContainer: Boolean!
 }
 
+enum InconsistencyCleaningType {
+  ALL,
+  REF_DUPLICATE_CLEAN,
+  REF_MISSING_REPAIR
+}
+
 type StixCoreObjectEditMutations {
   delete: ID @auth(for: [KNOWLEDGE_KNUPDATE_KNDELETE])
   relationAdd(input: StixRefRelationshipAddInput!): StixRefRelationship @auth(for: [KNOWLEDGE_KNUPDATE])
@@ -16148,7 +16153,7 @@ type StixCoreObjectEditMutations {
   exportAsk(input: ExportAskInput!): [File!]  @auth(for: [KNOWLEDGE_KNGETEXPORT_KNASKEXPORT])
   exportPush(file: Upload!): Boolean @auth(for: [CONNECTORAPI])
   removeFromDraft: ID @auth(for: [KNOWLEDGE])
-  cleanInconsistency: Boolean @auth(for: [KNOWLEDGE_KNUPDATE])
+  cleanInconsistency(cleaningTypes: [InconsistencyCleaningType!]!): Boolean @auth(for: [KNOWLEDGE_KNUPDATE])
 }
 
 ######## STIX DOMAIN OBJECT ENTITIES
