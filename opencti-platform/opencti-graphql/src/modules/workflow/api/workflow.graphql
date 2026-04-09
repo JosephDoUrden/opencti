@@ -17,6 +17,8 @@ type WorkflowPendingTransition {
         startedAt: String!
         taskId: String
         workId: String
+    workIds: [String!]
+    completedWorkIds: [String!]
 }
 
 type WorkflowActionConfig {

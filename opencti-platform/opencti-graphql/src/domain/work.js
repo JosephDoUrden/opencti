@@ -409,3 +409,12 @@ export const updateProcessedTime = async (context, user, workId, message, inErro
   }
   return workId;
 };
+
+/**
+ * Called by the task manager once it has finished dispatching a task's bundles.
+ * Resolves any pending workflow transition that is waiting for this work_id.
+ */
+export const resolveWorkflowTransitionForTask = async (context, user, workId) => {
+  if (!workId) return;
+  await resolvePendingWorkflowTransitionByWorkId(context, user, workId, true);
+};

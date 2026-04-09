@@ -1,18 +1,13 @@
 import { FunctionalError } from '../../../config/errors';
 import { createEntity, createRelation, loadEntity, updateAttribute } from '../../../database/middleware';
-import { storeLoadById } from '../../../database/middleware-loader';
+import { fullEntitiesList, storeLoadById } from '../../../database/middleware-loader';
 import { FilterMode } from '../../../generated/graphql';
 import { RELATION_HAS_WORKFLOW } from '../../../schema/internalRelationship';
 import type { AuthContext, AuthUser } from '../../../types/user';
 import { findByType as findEntitySettingByType } from '../../entitySetting/entitySetting-domain';
 import { WorkflowFactory } from '../engine/workflow-factory';
 import { ActionRegistry } from '../registry/workflow-actions';
-import {
-  ENTITY_TYPE_WORKFLOW_DEFINITION,
-  ENTITY_TYPE_WORKFLOW_INSTANCE,
-  type TriggerResult,
-  type WorkflowPendingTransition,
-} from '../types/workflow-types';
+import { ENTITY_TYPE_WORKFLOW_DEFINITION, ENTITY_TYPE_WORKFLOW_INSTANCE, type TriggerResult, type WorkflowPendingTransition } from '../types/workflow-types';
 import type { BasicStoreEntity } from '../../../types/store';
 import { bypassDraftContext } from '../../../utils/draftContext';
 
@@ -43,6 +38,16 @@ const parsePendingTransition = (instanceEntity?: WorkflowInstanceStoreEntity | n
   }
 };
 
+const getPendingTransitionWorkIds = (pendingTransition?: WorkflowPendingTransition | null): string[] => {
+  if (!pendingTransition) {
+    return [];
+  }
+  const workIds = pendingTransition.workIds && pendingTransition.workIds.length > 0
+    ? pendingTransition.workIds
+    : (pendingTransition.workId ? [pendingTransition.workId] : []);
+  return Array.from(new Set(workIds.filter((id): id is string => !!id)));
+};
+
 const normalizePendingStatus = (status?: string | null): string | null => {
   if (!status) {
     return null;
@@ -64,20 +69,8 @@ const validateNoAsyncStateActions = (definitionObj: any) => {
   }
 };
 
-const validateTransitionAsyncActions = (definitionObj: any) => {
-  const transitions = definitionObj?.transitions ?? [];
-  for (let index = 0; index < transitions.length; index += 1) {
-    const transition = transitions[index];
-    const actions = transition?.actions ?? [];
-    const asyncActions = actions.filter((a: any) => a?.mode === 'async');
-    const syncActions = actions.filter((a: any) => a?.mode !== 'async');
-    if (asyncActions.length > 1) {
-      throw FunctionalError('Only one async action is supported per transition for now.');
-    }
-    if (asyncActions.length > 0 && syncActions.length > 0) {
-      throw FunctionalError('Mixing sync and async actions in the same transition is not supported.');
-    }
-  }
+const validateTransitionAsyncActions = (_definitionObj: any) => {
+  // Multiple async actions and mixed sync/async per transition are supported.
 };
 
 const getWorkflowConfig = async (context: AuthContext, user: AuthUser, targetType: string) => {
@@ -187,9 +180,6 @@ export const setWorkflowDefinition = async (
 
   validateNoAsyncStateActions(definitionObj);
   validateTransitionAsyncActions(definitionObj);
-
-  const transitions = definitionObj?.transitions ?? [];
-  const asyncTransitions = transitions.filter((transition: any) => (transition?.actions ?? []).some((action: any) => action?.mode === 'async'));
 
   const workflowName = definitionObj.name || `Workflow for ${entityType}`;
 
@@ -441,33 +431,53 @@ export const triggerWorkflowEvent = async (
     const hasAsyncTransitionAction = (schemaTransition?.actions ?? []).some((a: any) => a?.mode === 'async');
 
     if (hasAsyncTransitionAction) {
-      const asyncAction = (schemaTransition?.actions ?? []).find((a: any) => a?.mode === 'async');
-      if (!asyncAction) {
-        return {
-          success: false,
-          executionStatus: 'failed',
-          reason: `No async action configured for transition '${eventName}'.`,
-          entity,
-        };
+      const transitionActions = schemaTransition?.actions ?? [];
+      const syncActions = transitionActions.filter((a: any) => a?.mode !== 'async');
+      const asyncActions = transitionActions.filter((a: any) => a?.mode === 'async');
+
+      // Run sync actions first, in order
+      for (const syncAction of syncActions) {
+        const syncFn = ActionRegistry[syncAction.type];
+        if (!syncFn) {
+          return {
+            success: false,
+            executionStatus: 'failed',
+            reason: `Action type '${syncAction.type}' not found in registry.`,
+            entity,
+          };
+        }
+        await syncFn(workflowActionContext, syncAction.params);
       }
-      const actionFn = ActionRegistry[asyncAction.type];
-      if (!actionFn) {
-        return {
-          success: false,
-          executionStatus: 'failed',
-          reason: `Action type '${asyncAction.type}' not found in registry.`,
-          entity,
-        };
+
+      // Run all async actions, collect their workIds
+      const asyncResults: Array<{ taskId?: string; workId?: string }> = [];
+      for (const asyncAction of asyncActions) {
+        const actionFn = ActionRegistry[asyncAction.type];
+        if (!actionFn) {
+          return {
+            success: false,
+            executionStatus: 'failed',
+            reason: `Action type '${asyncAction.type}' not found in registry.`,
+            entity,
+          };
+        }
+        const actionResult = await actionFn(workflowActionContext, asyncAction.params);
+        if (actionResult && typeof actionResult === 'object') {
+          asyncResults.push(actionResult);
+        }
       }
-      const actionResult = await actionFn(workflowActionContext, asyncAction.params);
+
+      const workIds = asyncResults.map((r) => r.workId).filter((id): id is string => !!id);
       const pendingTransition: WorkflowPendingTransition = {
         id: `${eventName}-${Date.now()}`,
         event: eventName,
         fromState: transition.from,
         toState: transition.to,
         startedAt: new Date().toISOString(),
-        taskId: actionResult && typeof actionResult === 'object' ? actionResult.taskId : undefined,
-        workId: actionResult && typeof actionResult === 'object' ? actionResult.workId : undefined,
+        taskId: asyncResults[0]?.taskId,
+        workId: workIds[0],
+        workIds: workIds.length > 1 ? workIds : undefined,
+        completedWorkIds: [],
       };
       const instanceId = instanceEntity.internal_id || instanceEntity.id;
       await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
@@ -606,7 +616,8 @@ export const resolvePendingWorkflowTransitionByWorkId = async (
 ): Promise<void> => {
   const executionContext = bypassDraftContext(context);
   const executionUser = executionContext.user!;
-  const pendingInstance = await loadEntity(executionContext, executionUser, [ENTITY_TYPE_WORKFLOW_INSTANCE], {
+
+  let pendingInstance: WorkflowInstanceStoreEntity | null = await loadEntity(executionContext, executionUser, [ENTITY_TYPE_WORKFLOW_INSTANCE], {
     filters: {
       mode: FilterMode.And,
       filters: [
@@ -617,9 +628,56 @@ export const resolvePendingWorkflowTransitionByWorkId = async (
     },
   }) as WorkflowInstanceStoreEntity;
 
+  // Fallback path for out-of-order async completion events: if a workId from
+  // the tracked list finishes before it becomes the current pending_work_id,
+  // find the matching pending transition by scanning pending instances.
+  if (!pendingInstance) {
+    const pendingInstances = await fullEntitiesList<WorkflowInstanceStoreEntity>(executionContext, executionUser, [ENTITY_TYPE_WORKFLOW_INSTANCE], {
+      filters: {
+        mode: FilterMode.And,
+        filters: [
+          { key: ['pending_status'], values: ['pending'] },
+        ],
+        filterGroups: [],
+      },
+    });
+    pendingInstance = pendingInstances.find((instance) => {
+      const pendingTransition = parsePendingTransition(instance);
+      const trackedWorkIds = getPendingTransitionWorkIds(pendingTransition);
+      return trackedWorkIds.includes(workId);
+    }) || null;
+  }
+
   if (!pendingInstance) {
     return;
   }
+
+  const pendingTransition = parsePendingTransition(pendingInstance);
+  const trackedWorkIds = getPendingTransitionWorkIds(pendingTransition);
+  if (trackedWorkIds.length === 0 || !trackedWorkIds.includes(workId)) {
+    return;
+  }
+
+  if (success) {
+    const completedWorkIds = Array.from(new Set([...(pendingTransition?.completedWorkIds ?? []), workId]));
+    const remainingWorkIds = trackedWorkIds.filter((id) => !completedWorkIds.includes(id));
+    const instanceId = pendingInstance.id || pendingInstance.internal_id;
+
+    if (remainingWorkIds.length > 0) {
+      const nextPendingTransition: WorkflowPendingTransition = {
+        ...pendingTransition!,
+        workId: remainingWorkIds[0],
+        workIds: trackedWorkIds.length > 1 ? trackedWorkIds : undefined,
+        completedWorkIds,
+      };
+      await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+        { key: 'pending_work_id', value: [remainingWorkIds[0]] },
+        { key: 'pending_transition', value: [JSON.stringify(nextPendingTransition)] },
+      ]);
+      return;
+    }
+  }
+
   await resolvePendingWorkflowTransition(
     executionContext,
     executionUser,

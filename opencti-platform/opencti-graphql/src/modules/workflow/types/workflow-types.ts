@@ -20,6 +20,8 @@ export interface WorkflowPendingTransition {
   startedAt: string;
   taskId?: string;
   workId?: string;
+  workIds?: string[];
+  completedWorkIds?: string[];
 }
 
 export interface AsyncActionResult {

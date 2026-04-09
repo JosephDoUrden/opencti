@@ -50,7 +50,7 @@ import {
 import { schemaRelationsRefDefinition } from '../schema/schema-relationsRef';
 import { getDraftContext } from '../utils/draftContext';
 import { getBestBackgroundConnectorId, pushToWorkerForConnector } from '../database/rabbitmq';
-import { updateExpectationsNumber, updateProcessedTime } from '../domain/work';
+import { resolveWorkflowTransitionForTask, updateExpectationsNumber, updateProcessedTime } from '../domain/work';
 import { convertStoreToStix_2_1, convertTypeToStixType } from '../database/stix-2-1-converter';
 import { STIX_EXT_OCTI } from '../types/stix-2-1-extensions';
 import { RELATION_BASED_ON } from '../schema/stixCoreRelationship';
@@ -546,7 +546,11 @@ const workerTaskHandler = async (context, user, task, actionType, operations) =>
     // Task rule is enlist step by step
     await taskRule(context, user, task, callback);
   }
-  return updateTask(context, task.id, { completed: true });
+  await updateTask(context, task.id, { completed: true });
+  // Resolve any pending workflow transition tied to this task's work_id now that
+  // the task manager has dispatched everything. This ensures the workflow does not
+  // stay stuck in "pending" if the Python worker is slow or unavailable.
+  await resolveWorkflowTransitionForTask(context, user, task.work_id);
 };
 
 // If task was created before task migration to worker, we need to initialize a connector_id and and a work_id for it

@@ -1,7 +1,6 @@
 import { logApp } from '../../../config/conf';
 import { createListTask } from '../../../domain/backgroundTask-common';
 import { draftWorkspaceEditAuthorizedMembers, listDraftObjects, listDraftRelations, listDraftSightingRelations, validateDraftWorkspace } from '../../draftWorkspace/draftWorkspace-domain';
-import { MEMBER_ACCESS_RIGHT_VIEW } from '../../../utils/access';
 import type { AsyncActionResult, Context } from '../types/workflow-types';
 
 export type ActionFunction<TContext extends Context = Context> = (ctx: TContext, params?: any) => Promise<void | AsyncActionResult> | void | AsyncActionResult;
