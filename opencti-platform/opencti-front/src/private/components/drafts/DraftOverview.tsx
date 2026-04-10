@@ -7,6 +7,7 @@ import DraftDetails from '@components/drafts/DraftDetails';
 import DraftEdition from '@components/drafts/DraftEdition';
 import { useGetCurrentUserAccessRight } from '../../../utils/authorizedMembers';
 import useUserCanEditDraft from '../../../utils/hooks/useUserCanEditDraft';
+import DraftProcessMonitoringPanel from './DraftProcessMonitoringPanel';
 
 interface DraftOverviewProps {
   draft: DraftRootFragment$data;
@@ -50,6 +51,7 @@ const DraftOverview: FunctionComponent<DraftOverviewProps> = ({ draft }) => {
           <DraftEdition draftId={draft.id} overviewData={draft} />
         )}
       </div>
+      <DraftProcessMonitoringPanel draftId={draft.id} />
     </>
   );
 };

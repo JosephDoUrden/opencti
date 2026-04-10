@@ -1,16 +1,17 @@
-import React, { FunctionComponent, Suspense } from 'react';
+import React, { FunctionComponent, Suspense, useEffect } from 'react';
 import { graphql, PreloadedQuery, useFragment, usePreloadedQuery } from 'react-relay';
 import { DraftWorksQuery } from '@components/drafts/__generated__/DraftWorksQuery.graphql';
 import { DraftWorksFragment$data } from '@components/drafts/__generated__/DraftWorksFragment.graphql';
 import Chip from '@mui/material/Chip';
 import { useTheme } from '@mui/styles';
-import useQueryLoading from '../../../utils/hooks/useQueryLoading';
+import { useQueryLoadingWithLoadQuery } from '../../../utils/hooks/useQueryLoading';
 import { DataTableProps, DataTableVariant } from '../../../components/dataGrid/dataTableTypes';
 import { defaultRender } from '../../../components/dataGrid/dataTableUtils';
 import Loader, { LoaderVariant } from '../../../components/Loader';
 import DataTableWithoutFragment from '../../../components/dataGrid/DataTableWithoutFragment';
 import { hexToRGB } from '../../../utils/Colors';
 import type { Theme } from '../../../components/Theme';
+import { TEN_SECONDS } from '../../../utils/Time';
 
 export const draftWorksFragment = graphql`
   fragment DraftWorksFragment on DraftWorkspace {
@@ -118,7 +119,15 @@ type DraftWorksProps = {
 
 const DraftWorks = (props: DraftWorksProps) => {
   const { draftId } = props;
-  const queryRef = useQueryLoading<DraftWorksQuery>(draftWorksQuery, { id: draftId });
+  const [queryRef, loadQuery] = useQueryLoadingWithLoadQuery<DraftWorksQuery>(draftWorksQuery, { id: draftId });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadQuery({ id: draftId }, { fetchPolicy: 'store-and-network' });
+    }, TEN_SECONDS);
+    return () => clearInterval(interval);
+  }, [draftId, loadQuery]);
+
   return (
     <>
       {queryRef && (

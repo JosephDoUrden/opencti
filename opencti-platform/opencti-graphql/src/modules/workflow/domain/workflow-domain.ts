@@ -7,7 +7,13 @@ import type { AuthContext, AuthUser } from '../../../types/user';
 import { findByType as findEntitySettingByType } from '../../entitySetting/entitySetting-domain';
 import { WorkflowFactory } from '../engine/workflow-factory';
 import { ActionRegistry } from '../registry/workflow-actions';
-import { ENTITY_TYPE_WORKFLOW_DEFINITION, ENTITY_TYPE_WORKFLOW_INSTANCE, type TriggerResult, type WorkflowPendingTransition } from '../types/workflow-types';
+import {
+  ENTITY_TYPE_WORKFLOW_DEFINITION,
+  ENTITY_TYPE_WORKFLOW_INSTANCE,
+  type TriggerResult,
+  type WorkflowPendingAsyncAction,
+  type WorkflowPendingTransition,
+} from '../types/workflow-types';
 import type { BasicStoreEntity } from '../../../types/store';
 import { bypassDraftContext } from '../../../utils/draftContext';
 
@@ -42,10 +48,47 @@ const getPendingTransitionWorkIds = (pendingTransition?: WorkflowPendingTransiti
   if (!pendingTransition) {
     return [];
   }
+  if (pendingTransition.asyncActions && pendingTransition.asyncActions.length > 0) {
+    const trackedFromActions = pendingTransition.asyncActions
+      .map((action) => action.workId)
+      .filter((id): id is string => !!id);
+    return Array.from(new Set(trackedFromActions));
+  }
   const workIds = pendingTransition.workIds && pendingTransition.workIds.length > 0
     ? pendingTransition.workIds
     : (pendingTransition.workId ? [pendingTransition.workId] : []);
   return Array.from(new Set(workIds.filter((id): id is string => !!id)));
+};
+
+const syncPendingTransitionTracking = (pendingTransition: WorkflowPendingTransition): WorkflowPendingTransition => {
+  if (!pendingTransition.asyncActions || pendingTransition.asyncActions.length === 0) {
+    return pendingTransition;
+  }
+
+  const allWorkIds = Array.from(new Set(
+    pendingTransition.asyncActions
+      .map((action) => action.workId)
+      .filter((id): id is string => !!id),
+  ));
+
+  const pendingWorkIds = pendingTransition.asyncActions
+    .filter((action) => action.status === 'pending')
+    .map((action) => action.workId)
+    .filter((id): id is string => !!id);
+
+  const completedWorkIds = Array.from(new Set(
+    pendingTransition.asyncActions
+      .filter((action) => action.status === 'success')
+      .map((action) => action.workId)
+      .filter((id): id is string => !!id),
+  ));
+
+  return {
+    ...pendingTransition,
+    workId: pendingWorkIds[0],
+    workIds: allWorkIds.length > 0 ? allWorkIds : undefined,
+    completedWorkIds,
+  };
 };
 
 const normalizePendingStatus = (status?: string | null): string | null => {
@@ -450,8 +493,9 @@ export const triggerWorkflowEvent = async (
       }
 
       // Run all async actions, collect their workIds
-      const asyncResults: Array<{ taskId?: string; workId?: string }> = [];
-      for (const asyncAction of asyncActions) {
+      const asyncActionExecutions: WorkflowPendingAsyncAction[] = [];
+      for (let index = 0; index < asyncActions.length; index += 1) {
+        const asyncAction = asyncActions[index];
         const actionFn = ActionRegistry[asyncAction.type];
         if (!actionFn) {
           return {
@@ -462,23 +506,33 @@ export const triggerWorkflowEvent = async (
           };
         }
         const actionResult = await actionFn(workflowActionContext, asyncAction.params);
-        if (actionResult && typeof actionResult === 'object') {
-          asyncResults.push(actionResult);
+        if (!actionResult || typeof actionResult !== 'object' || !actionResult.workId) {
+          return {
+            success: false,
+            executionStatus: 'failed',
+            reason: `Async action '${asyncAction.type}' didn't return a valid workId.`,
+            entity,
+          };
         }
+        asyncActionExecutions.push({
+          id: `${asyncAction.type}-${index}`,
+          type: asyncAction.type,
+          params: asyncAction.params,
+          status: 'pending',
+          taskId: actionResult.taskId,
+          workId: actionResult.workId,
+        });
       }
 
-      const workIds = asyncResults.map((r) => r.workId).filter((id): id is string => !!id);
-      const pendingTransition: WorkflowPendingTransition = {
+      const pendingTransition = syncPendingTransitionTracking({
         id: `${eventName}-${Date.now()}`,
         event: eventName,
         fromState: transition.from,
         toState: transition.to,
         startedAt: new Date().toISOString(),
-        taskId: asyncResults[0]?.taskId,
-        workId: workIds[0],
-        workIds: workIds.length > 1 ? workIds : undefined,
-        completedWorkIds: [],
-      };
+        taskId: asyncActionExecutions[0]?.taskId,
+        asyncActions: asyncActionExecutions,
+      });
       const instanceId = instanceEntity.internal_id || instanceEntity.id;
       await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
         { key: 'pending_status', value: ['pending'] },
@@ -658,10 +712,66 @@ export const resolvePendingWorkflowTransitionByWorkId = async (
     return;
   }
 
+  const instanceId = pendingInstance.id || pendingInstance.internal_id;
+  const hasAsyncActionTracking = !!pendingTransition?.asyncActions?.length;
+
+  if (hasAsyncActionTracking) {
+    const asyncActions = (pendingTransition?.asyncActions ?? []).map((action) => ({ ...action }));
+    const matchedAction = asyncActions.find((action) => action.workId === workId);
+    if (!matchedAction) {
+      return;
+    }
+
+    if (success) {
+      matchedAction.status = 'success';
+      matchedAction.error = undefined;
+    } else {
+      matchedAction.status = 'failed';
+      matchedAction.error = reason || 'Background work failed.';
+    }
+
+    const nextPendingTransition = syncPendingTransitionTracking({
+      ...pendingTransition!,
+      asyncActions,
+    });
+
+    const stillPendingActions = asyncActions.filter((action) => action.status === 'pending' && !!action.workId);
+    const failedActions = asyncActions.filter((action) => action.status === 'failed');
+
+    if (!success || failedActions.length > 0) {
+      const failureReason = reason
+        || failedActions[0]?.error
+        || 'Pending transition failed.';
+      await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+        { key: 'pending_status', value: ['failed'] },
+        { key: 'pending_work_id', value: [stillPendingActions[0]?.workId ?? null] },
+        { key: 'pending_transition', value: [JSON.stringify(nextPendingTransition)] },
+        { key: 'pending_error', value: [failureReason] },
+      ]);
+      return;
+    }
+
+    if (stillPendingActions.length > 0) {
+      await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+        { key: 'pending_work_id', value: [stillPendingActions[0].workId] },
+        { key: 'pending_transition', value: [JSON.stringify(nextPendingTransition)] },
+      ]);
+      return;
+    }
+
+    await resolvePendingWorkflowTransition(
+      executionContext,
+      executionUser,
+      pendingInstance.entity_id,
+      true,
+      reason,
+    );
+    return;
+  }
+
   if (success) {
     const completedWorkIds = Array.from(new Set([...(pendingTransition?.completedWorkIds ?? []), workId]));
     const remainingWorkIds = trackedWorkIds.filter((id) => !completedWorkIds.includes(id));
-    const instanceId = pendingInstance.id || pendingInstance.internal_id;
 
     if (remainingWorkIds.length > 0) {
       const nextPendingTransition: WorkflowPendingTransition = {
@@ -685,4 +795,106 @@ export const resolvePendingWorkflowTransitionByWorkId = async (
     success,
     reason,
   );
+};
+
+export const retryPendingWorkflowTransitionActions = async (
+  context: AuthContext,
+  user: AuthUser,
+  entityId: string,
+  actionIds?: string[],
+): Promise<TriggerResult> => {
+  const entity = await storeLoadById(context, user, entityId, 'Basic-Object');
+  if (!entity) {
+    throw FunctionalError('Entity not found', { entityId });
+  }
+
+  const executionContext = bypassDraftContext(context);
+  const executionUser = executionContext.user!;
+  const effectiveEntityId = entity.internal_id || entity.id;
+  const instanceEntity = await findWorkflowInstanceEntity(executionContext, executionUser, effectiveEntityId);
+  if (!instanceEntity || normalizePendingStatus(instanceEntity.pending_status) !== 'failed') {
+    return {
+      success: false,
+      executionStatus: 'failed',
+      reason: 'No failed pending transition to retry.',
+      entity,
+    };
+  }
+
+  const pendingTransition = parsePendingTransition(instanceEntity);
+  const asyncActions = pendingTransition?.asyncActions ? pendingTransition.asyncActions.map((action) => ({ ...action })) : [];
+  if (!pendingTransition || asyncActions.length === 0) {
+    return {
+      success: false,
+      executionStatus: 'failed',
+      reason: 'Pending transition does not contain retryable async actions.',
+      entity,
+    };
+  }
+
+  const retryableActions = asyncActions.filter((action) => action.status === 'failed');
+  const selectedActions = retryableActions.filter((action) => !actionIds || actionIds.length === 0 || actionIds.includes(action.id));
+
+  if (selectedActions.length === 0) {
+    return {
+      success: false,
+      executionStatus: 'failed',
+      reason: 'No failed async actions selected for retry.',
+      entity,
+    };
+  }
+
+  const actionEntity = await storeLoadById(context, user, entityId, 'Basic-Object') || entity;
+  const workflowActionContext = {
+    entity: actionEntity,
+    user,
+    context,
+  };
+
+  for (const action of selectedActions) {
+    const actionFn = ActionRegistry[action.type];
+    if (!actionFn) {
+      return {
+        success: false,
+        executionStatus: 'failed',
+        reason: `Action type '${action.type}' not found in registry.`,
+        entity,
+      };
+    }
+    const actionResult = await actionFn(workflowActionContext, action.params);
+    if (!actionResult || typeof actionResult !== 'object' || !actionResult.workId) {
+      return {
+        success: false,
+        executionStatus: 'failed',
+        reason: `Async retry for action '${action.type}' didn't return a valid workId.`,
+        entity,
+      };
+    }
+    action.status = 'pending';
+    action.taskId = actionResult.taskId;
+    action.workId = actionResult.workId;
+    action.error = undefined;
+  }
+
+  const nextPendingTransition = syncPendingTransitionTracking({
+    ...pendingTransition,
+    asyncActions,
+  });
+
+  const instanceId = instanceEntity.internal_id || instanceEntity.id;
+  await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+    { key: 'pending_status', value: ['pending'] },
+    { key: 'pending_work_id', value: [nextPendingTransition.workId ?? null] },
+    { key: 'pending_transition', value: [JSON.stringify(nextPendingTransition)] },
+    { key: 'pending_error', value: [null] },
+  ]);
+
+  const workflowInstance = await getWorkflowInstance(executionContext, executionUser, entityId);
+  return {
+    success: true,
+    executionStatus: 'pending',
+    pendingTransition: nextPendingTransition,
+    instance: workflowInstance,
+    entity,
+  };
 };

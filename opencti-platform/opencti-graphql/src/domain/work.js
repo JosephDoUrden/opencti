@@ -110,6 +110,19 @@ export const worksForSource = async (context, user, sourceId, args = {}) => {
   });
 };
 
+export const worksForBackgroundTask = async (context, user, taskId, args = {}) => {
+  const { first = 1, filters = null } = args;
+  const finalFilters = addFilter(filters, 'background_task_id', taskId);
+  return elPaginate(context, user, READ_INDEX_HISTORY, {
+    type: ENTITY_TYPE_WORK,
+    connectionFormat: false,
+    orderBy: 'timestamp',
+    orderMode: 'desc',
+    first,
+    filters: finalFilters,
+  });
+};
+
 export const loadExportWorksAsProgressFiles = async (context, user, sourceId) => {
   const works = await worksForSource(context, user, sourceId, { type: CONNECTOR_INTERNAL_EXPORT_FILE, first: 10 });
   const filterSuccessCompleted = works.filter((w) => w.status !== 'complete' || w.errors.length > 0);
@@ -416,5 +429,6 @@ export const updateProcessedTime = async (context, user, workId, message, inErro
  */
 export const resolveWorkflowTransitionForTask = async (context, user, workId) => {
   if (!workId) return;
-  await resolvePendingWorkflowTransitionByWorkId(context, user, workId, true);
+  // Intentionally no-op: workflow transitions must be resolved from work completion
+  // callbacks (reportExpectation/updateProcessedTime), not from dispatch completion.
 };

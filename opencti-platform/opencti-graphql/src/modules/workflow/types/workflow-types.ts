@@ -12,6 +12,18 @@ export const ENTITY_TYPE_WORKFLOW_INSTANCE = 'WorkflowInstance';
 
 export type WorkflowExecutionStatus = 'success' | 'pending' | 'failed';
 
+export type WorkflowPendingAsyncActionStatus = 'pending' | 'success' | 'failed';
+
+export interface WorkflowPendingAsyncAction {
+  id: string;
+  type: string;
+  params?: any;
+  status: WorkflowPendingAsyncActionStatus;
+  taskId?: string;
+  workId?: string;
+  error?: string;
+}
+
 export interface WorkflowPendingTransition {
   id: string;
   event: string;
@@ -22,6 +34,7 @@ export interface WorkflowPendingTransition {
   workId?: string;
   workIds?: string[];
   completedWorkIds?: string[];
+  asyncActions?: WorkflowPendingAsyncAction[];
 }
 
 export interface AsyncActionResult {

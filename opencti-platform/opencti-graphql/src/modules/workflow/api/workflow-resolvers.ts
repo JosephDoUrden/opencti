@@ -5,6 +5,7 @@ import {
   getAllowedTransitions,
   getWorkflowDefinition,
   getWorkflowInstance,
+  retryPendingWorkflowTransitionActions,
   resolvePendingWorkflowTransition,
   setWorkflowDefinition,
   triggerWorkflowEvent,
@@ -42,6 +43,13 @@ const workflowResolvers = {
       context: AuthContext,
     ) => {
       return resolvePendingWorkflowTransition(context, context.user!, entityId, success, reason);
+    },
+    retryPendingWorkflowTransitionActions: (
+      _: any,
+      { entityId, actionIds }: { entityId: string; actionIds?: string[] },
+      context: AuthContext,
+    ) => {
+      return retryPendingWorkflowTransitionActions(context, context.user!, entityId, actionIds);
     },
   },
   WorkflowInstance: {

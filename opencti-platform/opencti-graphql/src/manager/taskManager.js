@@ -562,7 +562,8 @@ const handleTaskMigrationToWorker = async (context, task) => {
       await updateTask(context, updatedTask.id, { connector_id: updatedTask.connector_id });
     }
     if (!updatedTask.work_id) {
-      const work = await createWorkForBackgroundTask(context, updatedTask.id, updatedTask.connector_id);
+      const workFriendlyName = updatedTask.description ? `background task: ${updatedTask.description}` : null;
+      const work = await createWorkForBackgroundTask(context, updatedTask.id, updatedTask.connector_id, workFriendlyName);
       updatedTask.work_id = work.id;
       await updateTask(context, updatedTask.id, { work_id: updatedTask.work_id });
     }

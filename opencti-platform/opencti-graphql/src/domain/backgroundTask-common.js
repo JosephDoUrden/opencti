@@ -312,10 +312,14 @@ export const checkActionValidity = async (context, user, input, scope, taskType)
   }
 };
 
-export const createWorkForBackgroundTask = async (context, taskId, connectorId) => {
+export const createWorkForBackgroundTask = async (context, taskId, connectorId, friendlyName = null) => {
   const connector = { internal_id: connectorId, connector_type: ConnectorType.ExternalImport };
-  const args = { background_task_id: taskId, receivedTime: now() };
-  return createWork(context, SYSTEM_USER, connector, `background task @ ${now()}`, connector.internal_id, args);
+  const draftContext = getDraftContext(context);
+  const args = { background_task_id: taskId, receivedTime: now(), draftContext };
+  const normalizedFriendlyName = friendlyName && friendlyName.trim().length > 0
+    ? friendlyName
+    : `background task @ ${now()}`;
+  return createWork(context, SYSTEM_USER, connector, normalizedFriendlyName, connector.internal_id, args);
 };
 
 export const createDefaultTask = async (context, user, input, taskType, taskExpectedNumber, scope = undefined) => {
@@ -324,7 +328,8 @@ export const createDefaultTask = async (context, user, input, taskType, taskExpe
   let connector_id;
   if (taskExpectedNumber > 0) {
     connector_id = await getBestBackgroundConnectorId(context, user);
-    const work = await createWorkForBackgroundTask(context, taskId, connector_id);
+    const workFriendlyName = input.description ? `background task: ${input.description}` : null;
+    const work = await createWorkForBackgroundTask(context, taskId, connector_id, workFriendlyName);
     work_id = work.id;
   }
   let task = {

@@ -2,6 +2,7 @@ import { deleteTask, createQueryTask, findBackgroundTaskPaginated, findById } fr
 import { createListTask } from '../domain/backgroundTask-common';
 import { ENTITY_TYPE_WORK } from '../schema/internalObject';
 import { loadCreator } from '../database/members';
+import { worksForBackgroundTask } from '../domain/work';
 
 const taskResolvers = {
   Query: {
@@ -22,8 +23,13 @@ const taskResolvers = {
       return 'Unknown';
     },
     initiator: (task, _, context) => loadCreator(context, context.user, task.initiator_id),
-    work: (task, _, context) => {
-      return task.work_id ? context.batch.idsBatchLoader.load({ id: task.work_id, type: ENTITY_TYPE_WORK }) : undefined;
+    work: async (task, _, context) => {
+      if (task.work_id) {
+        return context.batch.idsBatchLoader.load({ id: task.work_id, type: ENTITY_TYPE_WORK });
+      }
+      // Fallback for tasks where work_id has not been persisted yet.
+      const fallbackWorks = await worksForBackgroundTask(context, context.user, task.id, { first: 1 });
+      return fallbackWorks.length > 0 ? fallbackWorks[0] : undefined;
     },
   },
 };

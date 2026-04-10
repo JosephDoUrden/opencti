@@ -1,6 +1,17 @@
 import React, { FunctionComponent, useState } from 'react';
 import { graphql, useFragment, useMutation } from 'react-relay';
-import { Alert, AlertTitle, DialogActions, DialogContentText, Menu, MenuItem } from '@mui/material';
+import {
+  Alert,
+  AlertTitle,
+  CircularProgress,
+  DialogActions,
+  DialogContentText,
+  LinearProgress,
+  Menu,
+  MenuItem,
+  Stack,
+  Typography,
+} from '@mui/material';
 import { ArrowDropDownOutlined } from '@mui/icons-material';
 import ItemStatus from '../../../../components/ItemStatus';
 import Button from '../../../../components/common/button/Button';
@@ -27,6 +38,11 @@ export const workflowStatusFragment = graphql`
         id
         event
         toState
+        asyncActions {
+          id
+          type
+          status
+        }
       }
       currentStatus {
         id
@@ -62,6 +78,11 @@ const workflowStatusTriggerMutation = graphql`
         id
         event
         toState
+        asyncActions {
+          id
+          type
+          status
+        }
       }
       instance {
         id
@@ -72,6 +93,72 @@ const workflowStatusTriggerMutation = graphql`
           id
           event
           toState
+          asyncActions {
+            id
+            type
+            status
+          }
+        }
+        currentStatus {
+          id
+          template {
+            name
+            color
+          }
+        }
+        allowedTransitions {
+          event
+          toState
+          actions
+          toStatus {
+            id
+            template {
+              name
+              color
+            }
+          }
+        }
+      }
+      entity {
+        ... on DraftWorkspace {
+          ...WorkflowStatus_data
+        }
+      }
+    }
+  }
+`;
+
+const workflowStatusRetryMutation = graphql`
+  mutation WorkflowStatusRetryMutation($entityId: String!) {
+    retryPendingWorkflowTransitionActions(entityId: $entityId) {
+      success
+      reason
+      newState
+      executionStatus
+      pendingTransition {
+        id
+        event
+        toState
+        asyncActions {
+          id
+          type
+          status
+        }
+      }
+      instance {
+        id
+        currentState
+        pendingStatus
+        pendingError
+        pendingTransition {
+          id
+          event
+          toState
+          asyncActions {
+            id
+            type
+            status
+          }
         }
         currentStatus {
           id
@@ -130,6 +217,7 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
   const draft = useFragment(workflowStatusFragment, data);
   const { exitDraft } = useSwitchDraft();
   const [commit, approving] = useMutation<WorkflowStatusTriggerMutation>(workflowStatusTriggerMutation);
+  const [retryCommit, retrying] = useMutation(workflowStatusRetryMutation);
 
   if (!draft.workflowInstance) {
     return null;
@@ -138,6 +226,7 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
   const { workflowInstance } = draft;
   const pendingStatus = (workflowInstance as any).pendingStatus;
   const pendingError = (workflowInstance as any).pendingError;
+  const pendingTransition = (workflowInstance as any).pendingTransition;
   const isPending = pendingStatus === 'pending' || pendingStatus === 'PENDING';
   const hasTransitions = workflowInstance.allowedTransitions.length > 0;
 
@@ -203,6 +292,23 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
     }
   };
 
+  const handleRetryPendingTransition = () => {
+    if (!pendingTransition?.event || isPending) {
+      return;
+    }
+    retryCommit({
+      variables: {
+        entityId: draft.id,
+      },
+      onCompleted: (response: any) => {
+        const executionStatus = response.retryPendingWorkflowTransitionActions?.executionStatus;
+        if (response.retryPendingWorkflowTransitionActions?.success && executionStatus === 'pending') {
+          MESSAGING$.notifySuccess(t_i18n('Workflow retry started and is pending completion'));
+        }
+      },
+    });
+  };
+
   return (
     <>
       {hasTransitions && (
@@ -216,12 +322,30 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
         </Button>
       )}
       {isPending && (
-        <Alert sx={{ mt: 1, mb: 1 }} severity="info">
-          {t_i18n('A workflow transition is currently pending. Please wait for completion before triggering another transition.')}
-        </Alert>
+        <Stack spacing={0.5} sx={{ mt: 0.5, mb: 0.5 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <CircularProgress size={12} thickness={6} />
+            <Typography variant="body2" component="div" color="text.secondary">
+              {t_i18n('Workflow transition pending')}
+            </Typography>
+          </Stack>
+          <LinearProgress sx={{ height: 3, borderRadius: 4 }} />
+        </Stack>
       )}
       {!isPending && pendingError && (
-        <Alert sx={{ mt: 1, mb: 1 }} severity="error">
+        <Alert
+          sx={{ mt: 1, mb: 1 }}
+          severity="error"
+          action={(
+            <Button
+              variant="secondary"
+              disabled={approving || retrying || !pendingTransition?.event}
+              onClick={handleRetryPendingTransition}
+            >
+              {t_i18n('Retry')}
+            </Button>
+          )}
+        >
           {pendingError}
         </Alert>
       )}

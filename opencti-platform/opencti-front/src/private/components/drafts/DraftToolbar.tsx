@@ -9,12 +9,14 @@ import DraftProcessingStatus from './DraftProcessingStatus';
 import { useQueryLoadingWithLoadQuery } from '../../../utils/hooks/useQueryLoading';
 import ErrorNotFound from '../../../components/ErrorNotFound';
 import DraftExit from './DraftExit';
-import { THIRTY_SECONDS } from '../../../utils/Time';
+import { fetchQuery } from '../../../relay/environment';
 import useInterval from '../../../utils/hooks/useInterval';
 import DraftAuthorizedMembers from './DraftAuthorizedMembers';
 import WorkflowStatus, { WorkflowTransitions } from '../common/workflow/WorkflowStatus';
 import { DraftToolbarQuery } from '@components/drafts/__generated__/DraftToolbarQuery.graphql';
 import { DraftToolbarFragment$key } from '@components/drafts/__generated__/DraftToolbarFragment.graphql';
+
+const TOOLBAR_POLL_INTERVAL = 2000;
 
 const draftFragment = graphql`
   fragment DraftToolbarFragment on DraftWorkspace {
@@ -91,12 +93,9 @@ const DraftToolbarWrapper = ({ draftId }: DraftToolbarWrapperProps) => {
 
   useInterval(
     () => {
-      loadQuery(
-        { id: draftId },
-        { fetchPolicy: 'store-and-network' },
-      );
+      fetchQuery(draftQuery, { id: draftId }).toPromise();
     },
-    THIRTY_SECONDS,
+    TOOLBAR_POLL_INTERVAL,
   );
 
   return queryRef && (

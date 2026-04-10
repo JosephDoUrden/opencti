@@ -1,9 +1,25 @@
 import { logApp } from '../../../config/conf';
 import { createListTask } from '../../../domain/backgroundTask-common';
-import { draftWorkspaceEditAuthorizedMembers, listDraftObjects, listDraftRelations, listDraftSightingRelations, validateDraftWorkspace } from '../../draftWorkspace/draftWorkspace-domain';
+import { DRAFT_OPERATION_CREATE, DRAFT_OPERATION_UPDATE } from '../../draftWorkspace/draftOperations';
+import {
+  draftWorkspaceEditAuthorizedMembers,
+  listDraftObjects,
+  listDraftRelations,
+  listDraftSightingRelations,
+  validateDraftWorkspace,
+} from '../../draftWorkspace/draftWorkspace-domain';
 import type { AsyncActionResult, Context } from '../types/workflow-types';
 
 export type ActionFunction<TContext extends Context = Context> = (ctx: TContext, params?: any) => Promise<void | AsyncActionResult> | void | AsyncActionResult;
+
+const isShareableDraftElement = (element: any): boolean => {
+  const draftOperation = element?.draft_change?.draft_operation;
+  // Keep only direct draft changes and ignore linked/delete artifacts.
+  if (!draftOperation) {
+    return true;
+  }
+  return draftOperation === DRAFT_OPERATION_CREATE || draftOperation === DRAFT_OPERATION_UPDATE;
+};
 
 export const ActionRegistry: Record<string, ActionFunction> = {
   // actions examples:
@@ -26,6 +42,11 @@ export const ActionRegistry: Record<string, ActionFunction> = {
       ...a,
       type: typeof a?.type === 'string' ? a.type.toUpperCase() : a?.type,
     }));
+    const normalizedActionSummary = normalizedActions
+      .map((a: any) => String(a?.type ?? ''))
+      .filter((type: string) => type.length > 0)
+      .map((type: string) => type.toLowerCase().replace(/_/g, ' '))
+      .join(', ');
 
     if (entity.entity_type === 'DraftWorkspace' && !params?.ids) {
       const draftContext = { ...context, draft_context: targetId };
@@ -34,9 +55,18 @@ export const ActionRegistry: Record<string, ActionFunction> = {
       const sightings = await listDraftSightingRelations(draftContext, user, { draftId: targetId, first: 5000 });
 
       ids = [
-        ...((objects?.edges ?? []).map((e: any) => e.node.internal_id)),
-        ...((relations?.edges ?? []).map((e: any) => e.node.internal_id)),
-        ...((sightings?.edges ?? []).map((e: any) => e.node.internal_id))
+        ...((objects?.edges ?? [])
+          .map((e: any) => e.node)
+          .filter(isShareableDraftElement)
+          .map((node: any) => node.internal_id)),
+        ...((relations?.edges ?? [])
+          .map((e: any) => e.node)
+          .filter(isShareableDraftElement)
+          .map((node: any) => node.internal_id)),
+        ...((sightings?.edges ?? [])
+          .map((e: any) => e.node)
+          .filter(isShareableDraftElement)
+          .map((node: any) => node.internal_id)),
       ];
     }
 
@@ -44,7 +74,7 @@ export const ActionRegistry: Record<string, ActionFunction> = {
       ids,
       scope: params?.scope,
       actions: normalizedActions,
-      description: params?.description ?? `Workflow async action for ${entity.internal_id || entity.id}`,
+      description: params?.description ?? `Workflow async action (${normalizedActionSummary || 'list task'}) for ${entity.internal_id || entity.id}`,
       orderMode: params?.orderMode,
     };
     const task = await createListTask(context, user, input);
