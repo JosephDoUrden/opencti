@@ -47,6 +47,9 @@ export enum WorkflowActionType {
   updateAuthorizedMembers = 'updateAuthorizedMembers',
   validateDraft = 'validateDraft',
   backgroundListTask = 'backgroundListTask',
+  asyncListTask = 'asyncListTask',
+  shareToOrganization = 'shareToOrganization',
+  unshareFromOrganization = 'unshareFromOrganization',
 }
 
 export const NODE_SIZE = { width: 160, height: 50 };
@@ -67,24 +70,28 @@ const formatActions = (actions: Action[] = []) => {
         mode,
       };
     }
-    if (type === 'backgroundListTask') {
-      const selectedOrganizations = (params as {
-        actions?: { context?: { values?: { value: string; label: string }[] } }[];
-        scope?: string;
-        description?: string;
-      })?.actions?.[0]?.context?.values ?? [];
+    if (type === 'backgroundListTask' || type === 'asyncListTask') {
+      const rawActions = (params as {
+        actions?: { type?: string; context?: { values?: string[] | { value: string; label: string }[] } }[];
+      })?.actions ?? [];
+      const normalizedActions = rawActions.map((action) => {
+        const rawValues = action?.context?.values ?? [];
+        const normalizedValues = rawValues.map((value) => (typeof value === 'string' ? value : value.value));
+        return {
+          ...action,
+          context: {
+            ...(action?.context ?? {}),
+            values: normalizedValues,
+          },
+        };
+      });
       return {
         type,
         mode: 'async',
         params: {
           scope: (params as { scope?: string })?.scope ?? 'KNOWLEDGE',
-          description: (params as { description?: string })?.description ?? 'Workflow org sharing',
-          actions: [{
-            type: 'share',
-            context: {
-              values: selectedOrganizations.map((organization) => organization.value),
-            },
-          }],
+          description: (params as { description?: string })?.description ?? 'Workflow async list task',
+          actions: normalizedActions,
         },
       };
     }

@@ -53,6 +53,14 @@ export const workflowQuery = graphql`
         }
       }
     }
+    organizations(search: "", first: 500) {
+      edges {
+        node {
+          id
+          name
+        }
+      }
+    }
     statusTemplates(search: "") {
       edges {
         node {

@@ -56,9 +56,39 @@ export const useWorkflowForm = (selectedElement: Node | Edge, onClose: () => voi
     } else {
       if (actionName === WorkflowActionType.updateAuthorizedMembers) {
         newItem = { type: actionName, params: { authorized_members: [] } };
-      } else if (actionName === WorkflowActionType.backgroundListTask) {
+      } else if (actionName === WorkflowActionType.shareToOrganization) {
         newItem = {
-          type: actionName,
+          type: WorkflowActionType.asyncListTask,
+          mode: 'async',
+          params: {
+            scope: 'KNOWLEDGE',
+            description: 'Workflow org sharing',
+            actions: [{
+              type: 'share',
+              context: {
+                values: [],
+              },
+            }],
+          },
+        };
+      } else if (actionName === WorkflowActionType.unshareFromOrganization) {
+        newItem = {
+          type: WorkflowActionType.asyncListTask,
+          mode: 'async',
+          params: {
+            scope: 'KNOWLEDGE',
+            description: 'Workflow org unsharing',
+            actions: [{
+              type: 'unshare',
+              context: {
+                values: [],
+              },
+            }],
+          },
+        };
+      } else if (actionName === WorkflowActionType.backgroundListTask || actionName === WorkflowActionType.asyncListTask) {
+        newItem = {
+          type: WorkflowActionType.asyncListTask,
           mode: 'async',
           params: {
             scope: 'KNOWLEDGE',

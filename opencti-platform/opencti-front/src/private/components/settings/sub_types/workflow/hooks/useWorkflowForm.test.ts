@@ -126,13 +126,44 @@ describe('useWorkflowForm', () => {
       });
 
       const expectedAction: Action = {
-        type: WorkflowActionType.backgroundListTask,
+        type: WorkflowActionType.asyncListTask,
         mode: 'async',
         params: {
           scope: 'KNOWLEDGE',
           description: 'Workflow org sharing',
           actions: [{
             type: 'share',
+            context: {
+              values: [],
+            },
+          }],
+        },
+      };
+      expect(helpers.setFieldValue).toHaveBeenCalledWith(WorkflowDataType.actions, [expectedAction]);
+    });
+
+    it('should add an async org unsharing action', () => {
+      const node: Node = { id: '1', position: { x: 0, y: 0 }, data: {} };
+      const { result } = renderHook(() => useWorkflowForm(node, mockOnClose));
+      const helpers = createMockFormikHelpers();
+
+      act(() => {
+        result.current.onAddObject(
+          WorkflowDataType.actions,
+          WorkflowActionType.unshareFromOrganization,
+          helpers.setFieldValue,
+          mockValues,
+        );
+      });
+
+      const expectedAction: Action = {
+        type: WorkflowActionType.asyncListTask,
+        mode: 'async',
+        params: {
+          scope: 'KNOWLEDGE',
+          description: 'Workflow org unsharing',
+          actions: [{
+            type: 'unshare',
             context: {
               values: [],
             },

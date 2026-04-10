@@ -26,6 +26,7 @@ export const useWorkflowInitialElements = (
   workflowDefinition: SubTypeWorkflowQuery$data['workflowDefinition'],
   statusTemplatesEdges: SubTypeWorkflowQuery$data['statusTemplates'],
   membersEdges: SubTypeWorkflowQuery$data['members'],
+  organizationsEdges?: Connection<{ id: string; name: string } | null | undefined> | null,
 ) => {
   const theme = useTheme<Theme>();
 
@@ -34,6 +35,7 @@ export const useWorkflowInitialElements = (
 
     const statusTemplates: StatusTemplate = convertEdgesToObject(statusTemplatesEdges);
     const members = convertEdgesToObject(membersEdges);
+    const organizations = convertEdgesToObject(organizationsEdges);
 
     // Populate authorized members
     const parseActions = (actions?: ReadonlyArray<ReadOnlyAction> | null): Action[] => {
@@ -57,19 +59,21 @@ export const useWorkflowInitialElements = (
             },
           };
         }
-        if (action.type === 'backgroundListTask') {
-          const organizationIds = (action?.params as { actions?: { context?: { values?: string[] } }[] })
-            ?.actions?.[0]?.context?.values ?? [];
+        if (action.type === 'backgroundListTask' || action.type === 'asyncListTask') {
+          const asyncActions = (action?.params as { actions?: { type?: string; context?: { values?: string[] } }[] })?.actions ?? [];
           return {
             ...action,
             params: {
               ...(action?.params ?? {}),
-              actions: [{
-                type: 'share',
+              actions: asyncActions.map((asyncAction) => ({
+                type: asyncAction?.type,
                 context: {
-                  values: organizationIds.map((id) => ({ value: id, label: id })),
+                  values: (asyncAction?.context?.values ?? []).map((id) => ({
+                    value: id,
+                    label: organizations[id]?.name ?? id,
+                  })),
                 },
-              }],
+              })),
             },
           } as Action;
         }
@@ -126,5 +130,5 @@ export const useWorkflowInitialElements = (
       initialNodes: [...stateNodes, ...transitionNodes],
       initialEdges: [...transitionEdges],
     };
-  }, [workflowDefinition]);
+  }, [workflowDefinition, statusTemplatesEdges, membersEdges, organizationsEdges]);
 };

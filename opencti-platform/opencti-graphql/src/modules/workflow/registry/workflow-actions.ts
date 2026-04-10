@@ -12,6 +12,8 @@ import type { AsyncActionResult, Context } from '../types/workflow-types';
 
 export type ActionFunction<TContext extends Context = Context> = (ctx: TContext, params?: any) => Promise<void | AsyncActionResult> | void | AsyncActionResult;
 
+const SHARING_ACTION_TYPES = new Set(['SHARE', 'SHARE_MULTIPLE', 'UNSHARE', 'UNSHARE_MULTIPLE']);
+
 const isShareableDraftElement = (element: any): boolean => {
   const draftOperation = element?.draft_change?.draft_operation;
   // Keep only direct draft changes and ignore linked/delete artifacts.
@@ -47,6 +49,7 @@ export const ActionRegistry: Record<string, ActionFunction> = {
       .filter((type: string) => type.length > 0)
       .map((type: string) => type.toLowerCase().replace(/_/g, ' '))
       .join(', ');
+    const hasSharingAction = normalizedActions.some((a: any) => SHARING_ACTION_TYPES.has(String(a?.type ?? '')));
 
     if (entity.entity_type === 'DraftWorkspace' && !params?.ids) {
       const draftContext = { ...context, draft_context: targetId };
@@ -54,19 +57,15 @@ export const ActionRegistry: Record<string, ActionFunction> = {
       const relations = await listDraftRelations(draftContext, user, { draftId: targetId, first: 5000 });
       const sightings = await listDraftSightingRelations(draftContext, user, { draftId: targetId, first: 5000 });
 
+      const normalizeNodes = (edges: any[]) => edges
+        .map((e: any) => e.node)
+        .filter((node: any) => !hasSharingAction || isShareableDraftElement(node))
+        .map((node: any) => node.internal_id);
+
       ids = [
-        ...((objects?.edges ?? [])
-          .map((e: any) => e.node)
-          .filter(isShareableDraftElement)
-          .map((node: any) => node.internal_id)),
-        ...((relations?.edges ?? [])
-          .map((e: any) => e.node)
-          .filter(isShareableDraftElement)
-          .map((node: any) => node.internal_id)),
-        ...((sightings?.edges ?? [])
-          .map((e: any) => e.node)
-          .filter(isShareableDraftElement)
-          .map((node: any) => node.internal_id)),
+        ...normalizeNodes(objects?.edges ?? []),
+        ...normalizeNodes(relations?.edges ?? []),
+        ...normalizeNodes(sightings?.edges ?? []),
       ];
     }
 
@@ -74,7 +73,7 @@ export const ActionRegistry: Record<string, ActionFunction> = {
       ids,
       scope: params?.scope,
       actions: normalizedActions,
-      description: params?.description ?? `Workflow async action (${normalizedActionSummary || 'list task'}) for ${entity.internal_id || entity.id}`,
+      description: params?.description ?? `Workflow async action (${normalizedActionSummary || 'task'}) for ${entity.internal_id || entity.id}`,
       orderMode: params?.orderMode,
     };
     const task = await createListTask(context, user, input);
@@ -83,4 +82,6 @@ export const ActionRegistry: Record<string, ActionFunction> = {
       workId: task?.work_id,
     };
   },
+  // Alias to expose a clearer action name in workflow definitions while keeping compatibility.
+  asyncListTask: async (ctx, params) => ActionRegistry.backgroundListTask(ctx, params),
 };

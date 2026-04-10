@@ -51,7 +51,10 @@ const ActionMenuButton = ({ onAddObject, type }: ActionMenuButtonProps) => {
         <MenuItem onClick={() => onClickItem('updateAuthorizedMembers')}>{t_i18n('Update authorized members')}</MenuItem>
         <MenuItem onClick={() => onClickItem('validateDraft')}>{t_i18n('Validate draft')}</MenuItem>
         {type === WorkflowDataType.actions && (
-          <MenuItem onClick={() => onClickItem('backgroundListTask')}>{t_i18n('Share with organizations (async)')}</MenuItem>
+          <>
+            <MenuItem onClick={() => onClickItem('shareToOrganization')}>{t_i18n('Share to an organization')}</MenuItem>
+            <MenuItem onClick={() => onClickItem('unshareFromOrganization')}>{t_i18n('Unshare from an organization')}</MenuItem>
+          </>
         )}
       </Menu>
     </div>

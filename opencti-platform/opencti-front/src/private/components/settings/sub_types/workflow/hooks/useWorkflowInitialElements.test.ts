@@ -40,6 +40,12 @@ describe('useWorkflowInitialElements', () => {
     ],
   };
 
+  const mockOrganizations = {
+    edges: [
+      { node: { id: 'org-1', name: 'Acme Org' } },
+    ],
+  };
+
   const mockWorkflowDefinition: SubTypeWorkflowQuery$data['workflowDefinition'] = {
     id: 'workflow-1',
     name: 'Sample Workflow',
@@ -78,7 +84,7 @@ describe('useWorkflowInitialElements', () => {
 
   it('should return empty arrays if workflowDefinition is null', () => {
     const { result } = renderHook(() =>
-      useWorkflowInitialElements(null, null, null),
+      useWorkflowInitialElements(null, null, null, null),
     );
 
     expect(result.current.initialNodes).toEqual([]);
@@ -87,7 +93,7 @@ describe('useWorkflowInitialElements', () => {
 
   it('should transform states into status nodes', () => {
     const { result } = renderHook(() =>
-      useWorkflowInitialElements(mockWorkflowDefinition, mockStatusTemplates, mockMembers),
+      useWorkflowInitialElements(mockWorkflowDefinition, mockStatusTemplates, mockMembers, mockOrganizations),
     );
 
     const statusNodes = result.current.initialNodes.filter(
@@ -109,7 +115,7 @@ describe('useWorkflowInitialElements', () => {
 
   it('should transform transitions into one node and two edges', () => {
     const { result } = renderHook(() =>
-      useWorkflowInitialElements(mockWorkflowDefinition, mockStatusTemplates, mockMembers),
+      useWorkflowInitialElements(mockWorkflowDefinition, mockStatusTemplates, mockMembers, mockOrganizations),
     );
 
     const transitionNodes = result.current.initialNodes.filter(
@@ -130,7 +136,7 @@ describe('useWorkflowInitialElements', () => {
 
   it('should enrich authorized members actions with member data', () => {
     const { result } = renderHook(() =>
-      useWorkflowInitialElements(mockWorkflowDefinition, mockStatusTemplates, mockMembers),
+      useWorkflowInitialElements(mockWorkflowDefinition, mockStatusTemplates, mockMembers, mockOrganizations),
     );
 
     const node = result.current.initialNodes.find((n: Node) => n.id === 'status-open');
@@ -152,7 +158,7 @@ describe('useWorkflowInitialElements', () => {
 
     const { result, rerender } = renderHook(
       ({ def }: HookProps) =>
-        useWorkflowInitialElements(def, mockStatusTemplates, mockMembers),
+        useWorkflowInitialElements(def, mockStatusTemplates, mockMembers, mockOrganizations),
       { initialProps: { def: mockWorkflowDefinition } },
     );
 
@@ -167,5 +173,38 @@ describe('useWorkflowInitialElements', () => {
     };
     rerender({ def: newDef });
     expect(result.current).not.toBe(firstResult);
+  });
+
+  it('should map organization ids to organization names for async list task actions', () => {
+    const workflowWithAsyncAction: SubTypeWorkflowQuery$data['workflowDefinition'] = {
+      ...mockWorkflowDefinition,
+      states: [
+        {
+          statusId: 'status-open',
+          onEnter: [
+            {
+              type: 'asyncListTask',
+              mode: 'async',
+              params: {
+                actions: [{
+                  type: 'share',
+                  context: { values: ['org-1'] },
+                }],
+              },
+            },
+          ],
+          onExit: [],
+        },
+      ],
+    };
+
+    const { result } = renderHook(() =>
+      useWorkflowInitialElements(workflowWithAsyncAction, mockStatusTemplates, mockMembers, mockOrganizations),
+    );
+
+    const node = result.current.initialNodes.find((n: Node) => n.id === 'status-open');
+    const values = node?.data.onEnter?.[0]?.params?.actions?.[0]?.context?.values;
+
+    expect(values).toEqual([{ value: 'org-1', label: 'Acme Org' }]);
   });
 });

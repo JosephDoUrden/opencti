@@ -10,6 +10,18 @@ import { camelCaseToSentenceCase } from '../../../../../utils/String';
 import { useFormatter } from '../../../../../components/i18n';
 import ObjectOrganizationField from '../../../common/form/ObjectOrganizationField';
 
+const getActionLabel = (value: { type: string; params?: { actions?: Array<{ type?: string }> } }, t_i18n: (value: string) => string) => {
+  const asyncActionType = value?.params?.actions?.[0]?.type;
+  if (value.type === 'updateAuthorizedMembers') return t_i18n('Update authorized members');
+  if (value.type === 'validateDraft') return t_i18n('Validate draft');
+  if (value.type === 'backgroundListTask' || value.type === 'asyncListTask') {
+    return asyncActionType === 'unshare'
+      ? t_i18n('Unshare from an organization')
+      : t_i18n('Share to an organization');
+  }
+  return camelCaseToSentenceCase(value.type);
+};
+
 interface WorkflowFieldItemProps extends FieldProps {
   onDelete: () => void;
 }
@@ -28,7 +40,7 @@ const WorkflowFieldItem = ({ field, onDelete }: WorkflowFieldItemProps) => {
       <Accordion expanded={expanded} variant="outlined" sx={{ width: '100%', mb: 2 }}>
         <AccordionSummary expandIcon={showExpandAccordionDetails && <ExpandMoreOutlined />} onClick={() => showExpandAccordionDetails && setExpanded(!expanded)}>
           <Typography sx={{ display: 'inline-flex', alignItems: 'center', fontWeight: 'bold', flexGrow: 1 }}>
-            {isCondition ? t_i18n('Condition') : camelCaseToSentenceCase(value.type)}
+            {isCondition ? t_i18n('Condition') : getActionLabel(value, t_i18n)}
           </Typography>
           <IconButton
             color="error"
@@ -52,7 +64,7 @@ const WorkflowFieldItem = ({ field, onDelete }: WorkflowFieldItemProps) => {
               {value.type === 'updateAuthorizedMembers' && (
                 <Field name={`${name}.params.authorized_members`} component={AuthorizedMembersField} showAllMembersLine canDeactivate={false} enableAccesses hideInfo addMeUserWithAdminRights />
               )}
-              {value.type === 'backgroundListTask' && (
+              {(value.type === 'backgroundListTask' || value.type === 'asyncListTask') && (
                 <>
                   <Field component={TextField} name={`${name}.params.description`} label={t_i18n('Description')} variant="standard" fullWidth />
                   <ObjectOrganizationField
