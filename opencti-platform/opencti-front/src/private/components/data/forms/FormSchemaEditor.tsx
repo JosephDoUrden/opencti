@@ -1948,6 +1948,7 @@ const FormSchemaEditor: FunctionComponent<FormSchemaEditorProps> = ({
                                 name="authorized_members"
                                 component={AuthorizedMembersField}
                                 withDynamicKeys={true}
+                                allowDynamicGroupsRestriction={true}
                               />
                               <AuthorizedMembersSync
                                 onChange={(vals) => {
