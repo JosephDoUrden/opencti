@@ -202,15 +202,7 @@ const FormViewInner: FunctionComponent<FormViewInnerProps> = ({ queryRef, embedd
     }
 
     if (parsedSchema.draftDefaults?.author?.isEditable) {
-      if (parsedSchema.draftDefaults?.author?.type === 'static' && parsedSchema.draftDefaults.author.defaultValue) {
-        inits.draftAuthor = {
-          value: parsedSchema.draftDefaults.author.defaultValue,
-          label: parsedSchema.draftDefaults.author.defaultValueLabel || parsedSchema.draftDefaults.author.defaultValue,
-          type: parsedSchema.draftDefaults.author.defaultValueType,
-        };
-      } else {
-        inits.draftAuthor = null;
-      }
+      inits.draftAuthor = null;
     }
 
     if (parsedSchema.draftDefaults?.authorizedMembers?.enabled) {
@@ -406,7 +398,7 @@ const FormViewInner: FunctionComponent<FormViewInnerProps> = ({ queryRef, embedd
       extraShapes.draftObjectParticipant = Yup.array().min(1, t_i18n('This field is required'));
     }
     // main_entity_author: empty is always valid (backend inherits from main entity)
-    const authorRequiresExplicitValue = schema.draftDefaults?.author?.type !== 'main_entity_author';
+    const authorRequiresExplicitValue = schema.draftDefaults?.author?.type === 'none';
     if (isDraft && schema.draftDefaults?.author?.isEditable && schema.draftDefaults?.author?.isRequired && authorRequiresExplicitValue) {
       extraShapes.draftAuthor = Yup.object()
         .nullable()
@@ -986,9 +978,9 @@ const FormViewInner: FunctionComponent<FormViewInnerProps> = ({ queryRef, embedd
                       label={t_i18n('Draft author')}
                       style={{ width: '100%', marginBottom: 20 }}
                       setFieldValue={setFieldValue}
-                      required={schema.draftDefaults?.author?.isRequired && schema.draftDefaults.author.type !== 'main_entity_author'}
-                      clearable={schema.draftDefaults.author.type === 'main_entity_author'}
-                      helpertext={schema.draftDefaults.author.type === 'main_entity_author' ? t_i18n('Default: Reuse main entity author (leave empty to inherit)') : undefined}
+                      required={schema.draftDefaults?.author?.isRequired && schema.draftDefaults?.author?.type === 'none'}
+                      clearable={schema.draftDefaults?.author?.type === 'main_entity_author'}
+                      helpertext={schema.draftDefaults?.author?.type === 'main_entity_author' ? t_i18n('Default: Reuse main entity author (leave empty to inherit)') : undefined}
                     />
                   </div>
                 )}
