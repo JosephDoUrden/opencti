@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 import graphql from '@rollup/plugin-graphql';
 import type { PluginOption } from 'vite';
@@ -21,7 +20,7 @@ export const buildIntegrationTestConfig = (include: string[]) => defineConfig({
       clean: false,
     },
     maxWorkers: 1,
-    isolate: false,
+    isolate: true,
     sequence: {
       shuffle: false,
       sequencer: class Sequencer extends BaseSequencer {
