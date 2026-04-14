@@ -23,6 +23,7 @@ import { Formik, Field, useFormikContext } from 'formik';
 import AuthorizedMembersField from '../../common/form/AuthorizedMembersField';
 import ObjectAssigneeField from '../../common/form/ObjectAssigneeField';
 import ObjectParticipantField from '../../common/form/ObjectParticipantField';
+import CreatedByField from '../../common/form/CreatedByField';
 import Button from '@common/button/Button';
 import { useFormatter } from '../../../../components/i18n';
 import type { Theme } from '../../../../components/Theme';
@@ -49,6 +50,7 @@ import { FieldOption } from '../../../../utils/field';
 type DraftAdvancedDefaultsValues = {
   objectAssignee: FieldOption[];
   objectParticipant: FieldOption[];
+  authorDefaultIdentity: FieldOption | null;
 };
 
 const DraftAdvancedDefaultsSync = ({ onChange }: { onChange: (vals: DraftAdvancedDefaultsValues) => void }) => {
@@ -1764,6 +1766,13 @@ const FormSchemaEditor: FunctionComponent<FormSchemaEditorProps> = ({
                 initialValues={{
                   objectAssignee: formData.draftDefaults?.objectAssignee?.defaults || [],
                   objectParticipant: formData.draftDefaults?.objectParticipant?.defaults || [],
+                  authorDefaultIdentity: (formData.draftDefaults?.author?.type === 'static' && formData.draftDefaults.author.defaultValue)
+                    ? {
+                        value: formData.draftDefaults.author.defaultValue,
+                        label: formData.draftDefaults.author.defaultValueLabel || formData.draftDefaults.author.defaultValue,
+                        type: formData.draftDefaults.author.defaultValueType,
+                      }
+                    : null,
                 }}
                 onSubmit={() => {}}
                 enableReinitialize
@@ -1850,9 +1859,19 @@ const FormSchemaEditor: FunctionComponent<FormSchemaEditorProps> = ({
                       >
                         <MenuItem value="none">{t_i18n('None (Default)')}</MenuItem>
                         <MenuItem value="main_entity_author">{t_i18n('Reuse Main Entity Author')}</MenuItem>
-                        <MenuItem value="current_user">{t_i18n('Current user')}</MenuItem>
+                        <MenuItem value="static">{t_i18n('Specific Identity')}</MenuItem>
                       </Select>
                     </FormControl>
+                    {formData.draftDefaults?.author?.type === 'static' && (
+                      <Box style={{ paddingLeft: 20, paddingBottom: 10 }}>
+                        <CreatedByField
+                          name="authorDefaultIdentity"
+                          label={t_i18n('Default author identity')}
+                          style={{ width: '100%', marginBottom: 20 }}
+                          setFieldValue={() => {}}
+                        />
+                      </Box>
+                    )}
                     <FormControlLabel
                       control={(
                         <Switch
@@ -1955,6 +1974,17 @@ const FormSchemaEditor: FunctionComponent<FormSchemaEditorProps> = ({
                         }
                         if (!areFieldOptionsEqual(formData.draftDefaults?.objectParticipant?.defaults || [], vals.objectParticipant)) {
                           handleFieldChange('draftDefaults.objectParticipant.defaults', vals.objectParticipant);
+                        }
+                        if (formData.draftDefaults?.author?.type === 'static') {
+                          const newValue = vals.authorDefaultIdentity?.value;
+                          if (formData.draftDefaults?.author?.defaultValue !== newValue) {
+                            handleFieldChange('draftDefaults.author', {
+                              ...formData.draftDefaults.author,
+                              defaultValue: newValue || undefined,
+                              defaultValueLabel: vals.authorDefaultIdentity?.label || undefined,
+                              defaultValueType: vals.authorDefaultIdentity?.type || undefined,
+                            });
+                          }
                         }
                       }}
                     />
