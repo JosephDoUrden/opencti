@@ -34,7 +34,6 @@ import ObjectAssigneeField from '../../../common/form/ObjectAssigneeField';
 import ObjectParticipantField from '../../../common/form/ObjectParticipantField';
 import { FieldOption } from '../../../../../utils/field';
 import useGranted, { BYPASS, INGESTION, MODULES } from '../../../../../utils/hooks/useGranted';
-import useAuth from '../../../../../utils/hooks/useAuth';
 import useImportAccess from '../../../../../utils/hooks/useImportAccess';
 import Card from '../../../../../components/common/card/Card';
 import FormFields from './FormFields';
@@ -143,7 +142,6 @@ const FormViewInner: FunctionComponent<FormViewInnerProps> = ({ queryRef, embedd
   const classes = useStyles();
   const { t_i18n } = useFormatter();
   const navigate = useNavigate();
-  const { me: _me } = useAuth();
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [pollingEntityId, setPollingEntityId] = useState<string | null>(null);
