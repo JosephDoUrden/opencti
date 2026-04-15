@@ -14,7 +14,6 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import Divider from '@mui/material/Divider';
 import TextField from '../../../../../components/TextField';
-import MarkdownField from '../../../../../components/fields/MarkdownField';
 import { useFormatter } from '../../../../../components/i18n';
 import { FormViewQuery } from './__generated__/FormViewQuery.graphql';
 import Loader, { LoaderVariant } from '../../../../../components/Loader';
@@ -37,6 +36,7 @@ import useGranted, { BYPASS, INGESTION, MODULES } from '../../../../../utils/hoo
 import useImportAccess from '../../../../../utils/hooks/useImportAccess';
 import Card from '../../../../../components/common/card/Card';
 import FormFields from './FormFields';
+import MarkdownField from '../../../../../components/fields/markdownField/MarkdownField';
 
 // Styles
 const useStyles = makeStyles<Theme>(() => ({
