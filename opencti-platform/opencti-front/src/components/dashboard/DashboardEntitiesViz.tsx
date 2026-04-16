@@ -1,37 +1,37 @@
 import { memo, ReactNode } from 'react';
 import { Box } from '@mui/material';
-import StixRelationshipsNumber from '@components/common/stix_relationships/StixRelationshipsNumber';
-import StixRelationshipsList from '@components/common/stix_relationships/StixRelationshipsList';
-import StixRelationshipsDistributionList from '@components/common/stix_relationships/StixRelationshipsDistributionList';
-import StixRelationshipsMultiVerticalBars from '@components/common/stix_relationships/StixRelationshipsMultiVerticalBars';
-import StixRelationshipsMultiLineChart from '@components/common/stix_relationships/StixRelationshipsMultiLineChart';
-import StixRelationshipsMultiAreaChart from '@components/common/stix_relationships/StixRelationshipsMultiAreaChart';
-import StixRelationshipsTimeline from '@components/common/stix_relationships/StixRelationshipsTimeline';
-import StixRelationshipsDonut from '@components/common/stix_relationships/StixRelationshipsDonut';
-import StixRelationshipsMultiHorizontalBars from '@components/common/stix_relationships/StixRelationshipsMultiHorizontalBars/StixRelationshipsMultiHorizontalBars';
-import StixRelationshipsHorizontalBars from '@components/common/stix_relationships/StixRelationshipsHorizontalBars';
-import StixRelationshipsRadar from '@components/common/stix_relationships/StixRelationshipsRadar';
-import StixRelationshipsPolarArea from '@components/common/stix_relationships/StixRelationshipsPolarArea';
-import StixRelationshipsMultiHeatMap from '@components/common/stix_relationships/StixRelationshipsMultiHeatMap';
-import StixRelationshipsTreeMap from '@components/common/stix_relationships/StixRelationshipsTreeMap';
-import StixRelationshipsMap from '@components/common/stix_relationships/StixRelationshipsMap';
-import StixRelationshipsWordCloud from '@components/common/stix_relationships/StixRelationshipsWordCloud';
-import { computerRelativeDate, dayStartDate, formatDate } from '../../../../utils/Time';
-import type { Widget, WidgetDataSelection } from '../../../../utils/widget/widget';
-import { useRemoveIdAndIncorrectKeysFromFilterGroupObject } from '../../../../utils/filters/filtersUtils';
-import type { DashboardConfig } from '../../../../utils/dashboard';
+import StixDomainObjectBookmarksList from '@components/common/stix_domain_objects/StixDomainObjectBookmarksList';
+import StixCoreObjectsNumber from '@components/common/stix_core_objects/StixCoreObjectsNumber';
+import StixCoreObjectsList from '@components/common/stix_core_objects/StixCoreObjectsList';
+import StixCoreObjectsDistributionList from '@components/common/stix_core_objects/StixCoreObjectsDistributionList';
+import StixCoreObjectsMultiVerticalBars from '@components/common/stix_core_objects/StixCoreObjectsMultiVerticalBars';
+import StixCoreObjectsMultiLineChart from '@components/common/stix_core_objects/StixCoreObjectsMultiLineChart';
+import StixCoreObjectsMultiAreaChart from '@components/common/stix_core_objects/StixCoreObjectsMultiAreaChart';
+import StixCoreObjectsTimeline from '@components/common/stix_core_objects/StixCoreObjectsTimeline';
+import StixCoreObjectsDonut from '@components/common/stix_core_objects/StixCoreObjectsDonut';
+import StixCoreObjectsPolarArea from '@components/common/stix_core_objects/StixCoreObjectsPolarArea';
+import StixCoreObjectsMultiHorizontalBars from '@components/common/stix_core_objects/StixCoreObjectsMultiHorizontalBars';
+import StixCoreObjectsHorizontalBars from '@components/common/stix_core_objects/StixCoreObjectsHorizontalBars';
+import StixCoreObjectsRadar from '@components/common/stix_core_objects/StixCoreObjectsRadar';
+import StixCoreObjectsMultiHeatMap from '@components/common/stix_core_objects/StixCoreObjectsMultiHeatMap';
+import StixCoreObjectsTreeMap from '@components/common/stix_core_objects/StixCoreObjectsTreeMap';
+import StixCoreObjectsWordCloud from '@components/common/stix_core_objects/StixCoreObjectsWordCloud';
+import type { Widget } from '../../utils/widget/widget';
+import { computerRelativeDate, dayStartDate, formatDate } from '../../utils/Time';
+import { useRemoveIdAndIncorrectKeysFromFilterGroupObject } from '../../utils/filters/filtersUtils';
+import type { DashboardConfig } from './dashboard-types';
 
-interface DashboardRelationshipsVizProps {
+interface DashboardEntitiesVizProps {
   widget: Widget;
   popover?: ReactNode;
   config: DashboardConfig;
 }
 
-const DashboardRelationshipsViz = ({
+const DashboardEntitiesViz = ({
   widget,
   popover,
   config,
-}: DashboardRelationshipsVizProps) => {
+}: DashboardEntitiesVizProps) => {
   const startDate = config.relativeDate
     ? computerRelativeDate(config.relativeDate)
     : config.startDate;
@@ -46,7 +46,7 @@ const DashboardRelationshipsViz = ({
   } else if (widget.perspective === 'audits') {
     mainEntityTypes = ['History'];
   }
-  const dataSelection: WidgetDataSelection[] = widget.dataSelection.map((data) => ({
+  const dataSelection = widget.dataSelection.map((data) => ({
     ...data,
     filters: useRemoveIdAndIncorrectKeysFromFilterGroupObject(data.filters, mainEntityTypes),
     dynamicFrom: useRemoveIdAndIncorrectKeysFromFilterGroupObject(data.dynamicFrom, ['Stix-Core-Object']),
@@ -54,9 +54,19 @@ const DashboardRelationshipsViz = ({
   }));
 
   switch (widget.type) {
+    case 'bookmark':
+      return (
+        <StixDomainObjectBookmarksList
+          variant={undefined} // because calling js component in ts
+          dataSelection={dataSelection}
+          parameters={widget.parameters as object} // because calling js component in ts
+          height={undefined} // because calling js component in ts
+          popover={popover}
+        />
+      );
     case 'number':
       return (
-        <StixRelationshipsNumber
+        <StixCoreObjectsNumber
           endDate={endDate}
           startDate={startDate}
           dataSelection={dataSelection}
@@ -67,35 +77,33 @@ const DashboardRelationshipsViz = ({
       );
     case 'list':
       return (
-        <StixRelationshipsList
+        <StixCoreObjectsList
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
           widgetId={widget.id}
-          dataSelection={dataSelection} // dynamicFrom and dynamicTo TODO
+          dataSelection={dataSelection}
           parameters={widget.parameters as object} // because calling js component in ts
           height={undefined} // because calling js component in ts
+          title={undefined} // because calling js component in ts
           popover={popover}
         />
       );
     case 'distribution-list':
       return (
-        <StixRelationshipsDistributionList // TODO idem
+        <StixCoreObjectsDistributionList
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
           dataSelection={dataSelection}
           parameters={widget.parameters as object} // because calling js component in ts
           height={undefined} // because calling js component in ts
-          title={undefined} // because calling js component in ts
-          field={undefined} // because calling js component in ts
-          overflow={undefined} // because calling js component in ts
           popover={popover}
         />
       );
     case 'vertical-bar':
       return (
-        <StixRelationshipsMultiVerticalBars
+        <StixCoreObjectsMultiVerticalBars
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
@@ -107,7 +115,7 @@ const DashboardRelationshipsViz = ({
       );
     case 'line':
       return (
-        <StixRelationshipsMultiLineChart
+        <StixCoreObjectsMultiLineChart
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
@@ -119,21 +127,19 @@ const DashboardRelationshipsViz = ({
       );
     case 'area':
       return (
-        <StixRelationshipsMultiAreaChart
+        <StixCoreObjectsMultiAreaChart
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
           dataSelection={dataSelection}
           parameters={widget.parameters as object} // because calling js component in ts
           height={undefined} // because calling js component in ts
-          title={undefined} // because calling js component in ts
-          relationshipTypes={undefined}
           popover={popover}
         />
       );
     case 'timeline':
       return (
-        <StixRelationshipsTimeline
+        <StixCoreObjectsTimeline
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
@@ -145,83 +151,70 @@ const DashboardRelationshipsViz = ({
       );
     case 'donut':
       return (
-        <StixRelationshipsDonut
+        <StixCoreObjectsDonut
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
           dataSelection={dataSelection}
           parameters={widget.parameters as object} // because calling js component in ts
-          height={undefined} // because calling js component in ts
-          title={undefined} // because calling js component in ts
-          field={undefined} // because calling js component in ts
+          height={undefined}
+          popover={popover}
+        />
+      );
+    case 'polar-area':
+      return (
+        <StixCoreObjectsPolarArea
+          variant={undefined} // because calling js component in ts
+          endDate={endDate}
+          startDate={startDate}
+          dataSelection={dataSelection}
+          parameters={widget.parameters}
           popover={popover}
         />
       );
     case 'horizontal-bar':
       if (
         dataSelection.length > 1
-        && dataSelection[0].attribute === 'internal_id'
+        && dataSelection[0].attribute?.endsWith('_id')
       ) {
         return (
-          <StixRelationshipsMultiHorizontalBars
+          <StixCoreObjectsMultiHorizontalBars
             variant={undefined} // because calling js component in ts
             endDate={endDate}
             startDate={startDate}
             dataSelection={dataSelection}
             parameters={widget.parameters as object} // because calling js component in ts
             height={undefined} // because calling js component in ts
-            title={undefined} // because calling js component in ts
-            field={undefined} // because calling js component in ts
             popover={popover}
           />
         );
       }
       return (
-        <StixRelationshipsHorizontalBars
+        <StixCoreObjectsHorizontalBars
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
           dataSelection={dataSelection}
           parameters={widget.parameters as object} // because calling js component in ts
           height={undefined} // because calling js component in ts
-          title={undefined} // because calling js component in ts
-          field={undefined} // because calling js component in ts
-          fromId={undefined} // because calling js component in ts
-          relationshipType={undefined} // because calling js component in ts
           popover={popover}
         />
       );
     case 'radar':
       return (
-        <StixRelationshipsRadar
+        <StixCoreObjectsRadar
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
           dataSelection={dataSelection}
           parameters={widget.parameters as object} // because calling js component in ts
           height={undefined} // because calling js component in ts
-          title={undefined} // because calling js component in ts
-          field={undefined} // because calling js component in ts
-          popover={popover}
-        />
-      );
-    case 'polar-area':
-      return (
-        <StixRelationshipsPolarArea
-          variant={undefined} // because calling js component in ts
-          endDate={endDate}
-          startDate={startDate}
-          dataSelection={dataSelection}
-          parameters={widget.parameters as object} // because calling js component in ts
-          height={undefined} // because calling js component in ts
-          title={undefined} // because calling js component in ts
-          field={undefined} // because calling js component in ts
           popover={popover}
         />
       );
     case 'heatmap':
       return (
-        <StixRelationshipsMultiHeatMap
+        <StixCoreObjectsMultiHeatMap
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
@@ -233,43 +226,25 @@ const DashboardRelationshipsViz = ({
       );
     case 'tree':
       return (
-        <StixRelationshipsTreeMap
+        <StixCoreObjectsTreeMap
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
           dataSelection={dataSelection}
           parameters={widget.parameters as object} // because calling js component in ts
           height={undefined} // because calling js component in ts
-          title={undefined} // because calling js component in ts
-          field={undefined} // because calling js component in ts
-          popover={popover}
-        />
-      );
-    case 'map':
-      return (
-        <StixRelationshipsMap
-          variant={undefined} // because calling js component in ts
-          endDate={endDate}
-          startDate={startDate}
-          dataSelection={dataSelection}
-          parameters={widget.parameters as object} // because calling js component in ts
-          height={undefined} // because calling js component in ts
-          title={undefined} // because calling js component in ts
-          field={undefined} // because calling js component in ts
           popover={popover}
         />
       );
     case 'wordcloud':
       return (
-        <StixRelationshipsWordCloud
+        <StixCoreObjectsWordCloud
           variant={undefined} // because calling js component in ts
           endDate={endDate}
           startDate={startDate}
           dataSelection={dataSelection}
           parameters={widget.parameters as object} // because calling js component in ts
-          height={undefined} // because calling js component in ts
-          title={undefined} // because calling js component in ts
-          field={undefined} // because calling js component in ts
+          height={undefined}
           popover={popover}
         />
       );
@@ -278,4 +253,4 @@ const DashboardRelationshipsViz = ({
   }
 };
 
-export default memo(DashboardRelationshipsViz);
+export default memo(DashboardEntitiesViz);
