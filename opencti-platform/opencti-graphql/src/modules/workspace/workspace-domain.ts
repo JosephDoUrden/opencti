@@ -342,16 +342,7 @@ export const generateWorkspaceExportConfiguration = async (context: AuthContext,
   if (workspace.type !== 'dashboard') {
     throw FunctionalError('WORKSPACE_EXPORT_INCOMPATIBLE_TYPE', { type: workspace.type });
   }
-  const generatedManifest = await convertWorkspaceManifestIds(context, user, workspace.manifest, 'internal');
-  const exportConfigration = {
-    openCTI_version: pjson.version,
-    type: 'dashboard',
-    configuration: {
-      name: workspace.name,
-      manifest: generatedManifest,
-    },
-  };
-  return JSON.stringify(exportConfigration);
+  return exportDashboardConfiguration(context, user, workspace);
 };
 
 export const generateWidgetExportConfiguration = async (context: AuthContext, user: AuthUser, workspace: BasicStoreEntityWorkspace, widgetId: string) => {
@@ -361,13 +352,17 @@ export const generateWidgetExportConfiguration = async (context: AuthContext, us
   return exportWidget(context, user, workspace, widgetId);
 };
 
-export const workspaceImportConfiguration = async (context: AuthContext, user: AuthUser, file: Promise<FileHandle>) => {
-  const parsedData = await extractContentFrom(file);
-  checkConfigurationImport('dashboard', parsedData);
-  const authorizedMembers = initializeAuthorizedMembers([], user);
-  const { manifest } = parsedData.configuration;
+export const importDashboardConfiguration = async (context: AuthContext, user: AuthUser, content: DashboardExport) => {
+  checkConfigurationImport('dashboard', content);
+  const { manifest } = content.configuration;
   // Manifest ids must be rewritten for filters
-  const generatedManifest = await convertWorkspaceManifestIds(context, user, manifest, 'stix');
+  return await convertWorkspaceManifestIds(context, user, manifest, 'stix');
+};
+
+export const workspaceImportConfiguration = async (context: AuthContext, user: AuthUser, file: Promise<FileHandle>) => {
+  const parsedData: DashboardExport = await extractContentFrom(file);
+  const generatedManifest = await importDashboardConfiguration(context, user, parsedData);
+  const authorizedMembers = initializeAuthorizedMembers([], user);
   const mappedData = {
     type: parsedData.type,
     openCTI_version: parsedData.openCTI_version,
@@ -459,6 +454,7 @@ export const processImportWidgetConfiguration = async (
 
 interface DashboardLike {
   id: string;
+  name: string;
   manifest?: string | undefined | null;
 }
 
@@ -476,6 +472,32 @@ export const exportWidget = async (context: AuthContext, user: AuthUser, entity:
     return JSON.stringify(exportConfigration);
   }
   throw FunctionalError('WIDGET_EXPORT_NOT_FOUND', { workspace: entity.id, widget: widgetId });
+};
+
+export interface DashboardExport {
+  openCTI_version: string;
+  type: 'dashboard';
+  configuration: {
+    name: string;
+    manifest: string;
+  };
+}
+
+export const exportDashboardConfiguration = async (
+  context: AuthContext,
+  user: AuthUser,
+  entity: DashboardLike,
+) => {
+  const generatedManifest = await convertWorkspaceManifestIds(context, user, entity?.manifest ?? '', 'internal');
+  const exportConfigration: DashboardExport = {
+    openCTI_version: pjson.version,
+    type: 'dashboard',
+    configuration: {
+      name: entity.name,
+      manifest: generatedManifest,
+    },
+  };
+  return JSON.stringify(exportConfigration);
 };
 
 export const workspaceImportWidgetConfiguration = async (

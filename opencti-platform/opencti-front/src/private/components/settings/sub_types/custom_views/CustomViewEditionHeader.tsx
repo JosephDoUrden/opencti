@@ -10,7 +10,7 @@ import useEntityTranslation from '../../../../../utils/hooks/useEntityTranslatio
 import DashboardWidgetConfig from 'src/components/dashboard/DashboardWidgetConfig';
 import type { DashboardWidget } from '../../../../../components/dashboard/dashboard-types';
 import CustomViewKebabMenu from './CustomViewKebabMenu';
-// import ExportButtons from 'src/components/ExportButtons';
+import ExportButtons from 'src/components/ExportButtons';
 
 const headerFragment = graphql`
   fragment CustomViewEditionHeader_customView on CustomView {
@@ -28,9 +28,10 @@ interface CustomViewEditionHeaderProps {
   data: CustomViewEditionHeader_customView$key;
   onImportWidget: (widgetFile: File) => void;
   onCreateWidget: (value: DashboardWidget, variableName?: string) => void;
+  onExport: (customView: { id: string; name: string }) => void;
 }
 
-const CustomViewEditionHeader = ({ data, onCreateWidget, onImportWidget }: CustomViewEditionHeaderProps) => {
+const CustomViewEditionHeader = ({ data, onCreateWidget, onImportWidget, onExport }: CustomViewEditionHeaderProps) => {
   const { t_i18n } = useFormatter();
   const { translateEntityType } = useEntityTranslation();
   const [isFormOpen, setFormOpen] = useState(false);
@@ -47,6 +48,7 @@ const CustomViewEditionHeader = ({ data, onCreateWidget, onImportWidget }: Custo
     { label: t_i18n('Custom Views') },
     { label: customView.name },
   ];
+  const handleExportCustomView = () => onExport(customView);
 
   return (
     <>
@@ -57,15 +59,14 @@ const CustomViewEditionHeader = ({ data, onCreateWidget, onImportWidget }: Custo
           {customView.name}
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', marginLeft: 'auto', gap: 1 }}>
-          {
-            //  <ExportButtons
-            //    domElementId="container"
-            //    name={customView.name}
-            //    handleExportDashboard={() => {}}
-            //    exportToImage={false}
-            //    exportToPdf={false}
-            //  />
-          }
+          <ExportButtons
+            domElementId="container"
+            type="dashboard"
+            name={customView.name}
+            handleExportDashboard={handleExportCustomView}
+            exportToImage={false}
+            exportToPdf={false}
+          />
           <CustomViewKebabMenu data={customView} />
           <DashboardWidgetConfig
             onComplete={onCreateWidget}

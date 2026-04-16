@@ -2,7 +2,7 @@ import Button from '@common/button/Button';
 import { FileUploadOutlined } from '@mui/icons-material';
 import { Field, Form, Formik } from 'formik';
 import { FormikConfig } from 'formik/dist/types';
-import { BaseSyntheticEvent, useContext, useRef } from 'react';
+import { useContext } from 'react';
 import { graphql } from 'react-relay';
 import { useNavigate } from 'react-router-dom';
 import * as Yup from 'yup';
@@ -12,8 +12,7 @@ import IconButton from '../../../components/common/button/IconButton';
 import FormButtonContainer from '../../../components/common/form/FormButtonContainer';
 import MarkdownField from '../../../components/fields/markdownField/MarkdownField';
 import { useFormatter } from '../../../components/i18n';
-import { handleError, handleErrorInForm } from '../../../relay/environment';
-import { resolveLink } from '../../../utils/Entity';
+import { handleErrorInForm } from '../../../relay/environment';
 import Security from '../../../utils/Security';
 import useApiMutation from '../../../utils/hooks/useApiMutation';
 import { UserContext } from '../../../utils/hooks/useAuth';
@@ -57,7 +56,6 @@ interface WorkspaceCreationProps {
 
 const WorkspaceCreation = ({ paginationOptions, type }: WorkspaceCreationProps) => {
   const { t_i18n } = useFormatter();
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const { settings, isXTMHubAccessible } = useContext(UserContext);
   const importFromHubUrl = isNotEmptyField(settings?.platform_xtmhub_url)
     ? `${settings.platform_xtmhub_url}/redirect/opencti_custom_dashboards?platform_id=${settings.id}`
@@ -66,23 +64,6 @@ const WorkspaceCreation = ({ paginationOptions, type }: WorkspaceCreationProps) 
   const [commitImportMutation] = useApiMutation<WorkspaceCreationImportMutation>(importMutation);
   const [commitCreationMutation] = useApiMutation(workspaceMutation);
   const navigate = useNavigate();
-
-  const handleImport = (event: BaseSyntheticEvent) => {
-    const importedFile = event.target.files[0];
-    commitImportMutation({
-      variables: { file: importedFile },
-      onCompleted: (data) => {
-        if (inputRef.current) inputRef.current.value = ''; // Reset the input uploader ref
-        navigate(
-          `${resolveLink('Dashboard')}/${data.workspaceConfigurationImport}`,
-        );
-      },
-      onError: (error) => {
-        if (inputRef.current) inputRef.current.value = ''; // Reset the input uploader ref
-        handleError(error);
-      },
-    });
-  };
 
   const onSubmit: FormikConfig<WorkspaceCreationForm>['onSubmit'] = (values, { setSubmitting, resetForm, setErrors }) => {
     commitCreationMutation({

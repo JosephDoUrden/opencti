@@ -2168,6 +2168,7 @@
   "Import | Import | Data": "インポート｜インポート｜データ",
   "Import a CSV Feed": "CSVフィードのインポート",
   "Import a CSV mapper": "CSV マッパーをインポートする",
+  "Import a custom view": "カスタムビューのインポート",
   "Import a JSON mapper": "JSONマッパーのインポート",
   "Import a RSS Feed": "RSSフィードのインポート",
   "Import a Taxii Feed": "Taxiiフィードのインポート",

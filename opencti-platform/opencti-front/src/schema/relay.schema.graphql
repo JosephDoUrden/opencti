@@ -10765,6 +10765,7 @@ type Mutation {
   customViewWidgetConfigurationImport(id: ID!, input: ImportConfigurationInput!): CustomView
   customViewDuplicate(input: CustomViewDuplicateInput!): CustomView
   customViewDelete(id: ID!): ID!
+  customViewConfigurationImport(target_entity_type: String!, file: Upload!): CustomView!
   taxiiCollectionAdd(input: TaxiiCollectionAddInput!): TaxiiCollection
   taxiiCollectionEdit(id: ID!): TaxiiCollectionEditMutations
   feedAdd(input: FeedAddInput!): Feed
@@ -16195,6 +16196,7 @@ type CustomView implements InternalObject & BasicObject {
   enabled: Boolean
   default: Boolean
   toWidgetExport(widgetId: ID!): String!
+  toConfigurationExport: String!
 }
 
 type CustomViewsDisplayContext {

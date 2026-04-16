@@ -55,10 +55,24 @@ const dashboardFragment = graphql`
   }
 `;
 
+const dashboardExportQuery = graphql`
+    query DashboardExportQuery($id: String!) {
+        workspace(id: $id) {
+            toConfigurationExport
+        }
+    }
+`;
+
 const onExportWidget = async (id, widget) => {
   const data = await fetchQuery(dashboardExportWidgetQuery, { id, widgetId: widget.id })
     .toPromise();
   return data.workspace?.toWidgetExport;
+};
+
+const onExport = async (id) => {
+  const data = await fetchQuery(dashboardExportQuery, { id })
+    .toPromise();
+  return data.workspace?.toConfigurationExport;
 };
 
 const DashboardComponent = ({ data, noToolbar = false }) => {
@@ -101,8 +115,8 @@ const DashboardComponent = ({ data, noToolbar = false }) => {
     });
   };
 
-  const helpers = useDashboard({ entity: workspace, onSave, onImportWidget, onExportWidget });
-  const { handleAddWidget, handleImportWidget, handleDateChange, config } = helpers;
+  const helpers = useDashboard({ entity: workspace, onSave, onImportWidget, onExportWidget, onExport });
+  const { handleAddWidget, handleImportWidget, handleDateChange, handleExport, config } = helpers;
   return (
     <Stack gap={2}>
       {!noToolbar && (
@@ -110,6 +124,7 @@ const DashboardComponent = ({ data, noToolbar = false }) => {
           <WorkspaceHeader
             handleAddWidget={handleAddWidget}
             handleImportWidget={handleImportWidget}
+            handleExport={handleExport}
             data={workspace}
             variant="dashboard"
           />

@@ -7,6 +7,7 @@ import { useCustomViewDashboardEdit_LayoutMutation } from './__generated__/useCu
 import { useCustomViewDashboardEdit_WidgetImportMutation } from './__generated__/useCustomViewDashboardEdit_WidgetImportMutation.graphql';
 import { useCustomViewDashboardEdit_WidgetExportQuery$data } from './__generated__/useCustomViewDashboardEdit_WidgetExportQuery.graphql';
 import { useCustomViewDashboardEdit_Query$data } from './__generated__/useCustomViewDashboardEdit_Query.graphql';
+import { useCustomViewDashboardEdit_ExportQuery$data } from './__generated__/useCustomViewDashboardEdit_ExportQuery.graphql';
 
 export const customViewQuery = graphql`
   query useCustomViewDashboardEdit_Query($id: ID!) {
@@ -60,6 +61,14 @@ const customViewExportWidgetQuery = graphql`
   }
 `;
 
+const customViewExportQuery = graphql`
+  query useCustomViewDashboardEdit_ExportQuery($id: ID!) {
+    customView(id: $id) {
+      toConfigurationExport
+    }
+  }
+`;
+
 const onExportWidget = async (id: string, widget: { id: string; type: string }) => {
   const data = await fetchQuery(customViewExportWidgetQuery, { id, widgetId: widget.id })
     .toPromise();
@@ -67,6 +76,17 @@ const onExportWidget = async (id: string, widget: { id: string; type: string }) 
   const exportString = result.customView?.toWidgetExport;
   if (!exportString) {
     throw new Error('Failed to export widget');
+  }
+  return exportString;
+};
+
+const onExport = async (id: string) => {
+  const data = await fetchQuery(customViewExportQuery, { id })
+    .toPromise();
+  const result = data as useCustomViewDashboardEdit_ExportQuery$data;
+  const exportString = result.customView?.toConfigurationExport;
+  if (!exportString) {
+    throw new Error('Failed to export custom view');
   }
   return exportString;
 };
@@ -110,7 +130,7 @@ const useCustomViewDashboardEdit = ({ customView }: {
     });
   };
 
-  return useDashboard({ entity: customView, onImportWidget, onSave, onExportWidget });
+  return useDashboard({ entity: customView, onImportWidget, onSave, onExportWidget, onExport });
 };
 
 export default useCustomViewDashboardEdit;

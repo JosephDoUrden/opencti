@@ -16,6 +16,7 @@ type CustomView implements InternalObject & BasicObject {
     enabled: Boolean
     default: Boolean
     toWidgetExport(widgetId: ID!): String! @auth(for: [SETTINGS_SETCUSTOMIZATION]) @ff(flags: ["CUSTOM_VIEW"])
+    toConfigurationExport: String!
 }
 
 type CustomViewsDisplayContext {
@@ -78,5 +79,6 @@ type Mutation {
     customViewWidgetConfigurationImport(id: ID!, input: ImportConfigurationInput!): CustomView @auth(for: [SETTINGS_SETCUSTOMIZATION])
     customViewDuplicate(input: CustomViewDuplicateInput!): CustomView @auth(for: [SETTINGS_SETCUSTOMIZATION])
     customViewDelete(id: ID!): ID! @auth(for: [SETTINGS_SETCUSTOMIZATION])
+    customViewConfigurationImport(target_entity_type: String!, file: Upload!): CustomView! @auth(for: [SETTINGS_SETCUSTOMIZATION])
 }
 

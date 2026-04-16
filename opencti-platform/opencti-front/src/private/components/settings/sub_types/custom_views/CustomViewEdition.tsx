@@ -18,7 +18,7 @@ interface CustomViewEditionComponentProps {
 const CustomViewEditionComponent = ({ queryRef }: CustomViewEditionComponentProps) => {
   const { customView } = usePreloadedQuery(customViewQuery, queryRef);
   const helpers = useCustomViewDashboardEdit({ customView });
-  const { handleAddWidget, handleImportWidget, handleDateChange, config } = helpers;
+  const { handleAddWidget, handleImportWidget, handleDateChange, handleExport, config } = helpers;
   if (!customView) {
     return <ErrorNotFound />;
   }
@@ -29,6 +29,7 @@ const CustomViewEditionComponent = ({ queryRef }: CustomViewEditionComponentProp
           data={customView}
           onCreateWidget={handleAddWidget}
           onImportWidget={handleImportWidget}
+          onExport={handleExport}
         />
         <DashboardTimeFilters
           currentUserAccessRight="edit"

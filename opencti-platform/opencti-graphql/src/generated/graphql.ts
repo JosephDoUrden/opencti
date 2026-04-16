@@ -6448,6 +6448,7 @@ export type CustomView = BasicObject & InternalObject & {
   slug: Scalars['String']['output'];
   standard_id: Scalars['String']['output'];
   target_entity_type: Scalars['String']['output'];
+  toConfigurationExport: Scalars['String']['output'];
   toWidgetExport: Scalars['String']['output'];
   updated_at: Scalars['DateTime']['output'];
 };
@@ -16938,10 +16939,11 @@ export type Mutation = {
   csvMapperFieldPatch?: Maybe<CsvMapper>;
   csvMapperTest?: Maybe<CsvMapperTestResult>;
   customViewAdd: CustomView;
+  customViewConfigurationImport: CustomView;
+  customViewDelete: Scalars['ID']['output'];
   customViewDuplicate?: Maybe<CustomView>;
   customViewEdit?: Maybe<CustomView>;
   customViewWidgetConfigurationImport?: Maybe<CustomView>;
-  customViewDelete: Scalars['ID']['output'];
   dataComponentAdd?: Maybe<DataComponent>;
   dataComponentContextClean?: Maybe<DataComponent>;
   dataComponentContextPatch?: Maybe<DataComponent>;
@@ -17761,6 +17763,17 @@ export type MutationCustomViewAddArgs = {
 };
 
 
+export type MutationCustomViewConfigurationImportArgs = {
+  file: Scalars['Upload']['input'];
+  target_entity_type: Scalars['String']['input'];
+};
+
+
+export type MutationCustomViewDeleteArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationCustomViewDuplicateArgs = {
   input: CustomViewDuplicateInput;
 };
@@ -17775,11 +17788,6 @@ export type MutationCustomViewEditArgs = {
 export type MutationCustomViewWidgetConfigurationImportArgs = {
   id: Scalars['ID']['input'];
   input: ImportConfigurationInput;
-};
-
-
-export type MutationCustomViewDeleteArgs = {
-  id: Scalars['ID']['input'];
 };
 
 
@@ -42976,6 +42984,7 @@ export type CustomViewResolvers<ContextType = any, ParentType extends ResolversP
   slug?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   standard_id?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   target_entity_type?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  toConfigurationExport?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   toWidgetExport?: Resolver<ResolversTypes['String'], ParentType, ContextType, RequireFields<CustomViewToWidgetExportArgs, 'widgetId'>>;
   updated_at?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
@@ -46650,10 +46659,11 @@ export type MutationResolvers<ContextType = any, ParentType extends ResolversPar
   csvMapperFieldPatch?: Resolver<Maybe<ResolversTypes['CsvMapper']>, ParentType, ContextType, RequireFields<MutationCsvMapperFieldPatchArgs, 'id' | 'input'>>;
   csvMapperTest?: Resolver<Maybe<ResolversTypes['CsvMapperTestResult']>, ParentType, ContextType, RequireFields<MutationCsvMapperTestArgs, 'configuration' | 'file'>>;
   customViewAdd?: Resolver<ResolversTypes['CustomView'], ParentType, ContextType, RequireFields<MutationCustomViewAddArgs, 'input'>>;
+  customViewConfigurationImport?: Resolver<ResolversTypes['CustomView'], ParentType, ContextType, RequireFields<MutationCustomViewConfigurationImportArgs, 'file' | 'target_entity_type'>>;
+  customViewDelete?: Resolver<ResolversTypes['ID'], ParentType, ContextType, RequireFields<MutationCustomViewDeleteArgs, 'id'>>;
   customViewDuplicate?: Resolver<Maybe<ResolversTypes['CustomView']>, ParentType, ContextType, RequireFields<MutationCustomViewDuplicateArgs, 'input'>>;
   customViewEdit?: Resolver<Maybe<ResolversTypes['CustomView']>, ParentType, ContextType, RequireFields<MutationCustomViewEditArgs, 'id' | 'input'>>;
   customViewWidgetConfigurationImport?: Resolver<Maybe<ResolversTypes['CustomView']>, ParentType, ContextType, RequireFields<MutationCustomViewWidgetConfigurationImportArgs, 'id' | 'input'>>;
-  customViewDelete?: Resolver<ResolversTypes['ID'], ParentType, ContextType, RequireFields<MutationCustomViewDeleteArgs, 'id'>>;
   dataComponentAdd?: Resolver<Maybe<ResolversTypes['DataComponent']>, ParentType, ContextType, RequireFields<MutationDataComponentAddArgs, 'input'>>;
   dataComponentContextClean?: Resolver<Maybe<ResolversTypes['DataComponent']>, ParentType, ContextType, RequireFields<MutationDataComponentContextCleanArgs, 'id'>>;
   dataComponentContextPatch?: Resolver<Maybe<ResolversTypes['DataComponent']>, ParentType, ContextType, RequireFields<MutationDataComponentContextPatchArgs, 'id' | 'input'>>;

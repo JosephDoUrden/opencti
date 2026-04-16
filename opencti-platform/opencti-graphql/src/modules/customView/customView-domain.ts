@@ -1,4 +1,5 @@
 import slugify from 'slug';
+import type { FileHandle } from 'fs/promises';
 import { fullEntitiesList, storeLoadById } from '../../database/middleware-loader';
 import type { AuthContext, AuthUser } from '../../types/user';
 import { ENTITY_TYPE_CUSTOM_VIEW, type BasicStoreEntityCustomView, type StoreEntityCustomView } from './customView-types';
@@ -22,7 +23,15 @@ import { now } from '../../utils/format';
 import { publishUserAction } from '../../listener/UserActionListener';
 import { notify } from '../../database/redis';
 import { BUS_TOPICS } from '../../config/conf';
-import { exportWidget, processImportWidgetConfiguration, sanitizeElementForPublishAction } from '../workspace/workspace-domain';
+import {
+  exportDashboardConfiguration,
+  exportWidget,
+  importDashboardConfiguration,
+  processImportWidgetConfiguration,
+  sanitizeElementForPublishAction,
+  type DashboardExport,
+} from '../workspace/workspace-domain';
+import { extractContentFrom } from '../../utils/fileToContent';
 
 /**
  * Exclusion list: entity types not capable of
@@ -328,4 +337,52 @@ export const deleteCustomView = async (
   );
 
   return customViewId;
+};
+
+export const exportCustomView = (
+  context: AuthContext,
+  user: AuthUser,
+  customView: BasicStoreEntityCustomView,
+) => {
+  return exportDashboardConfiguration(context, user, customView);
+};
+
+export const importCustomViewConfiguration = async (
+  context: AuthContext,
+  user: AuthUser,
+  target_entity_type: string,
+  file: Promise<FileHandle>,
+) => {
+  const parsedData: DashboardExport = await extractContentFrom(file);
+  const generatedManifest = await importDashboardConfiguration(context, user, parsedData);
+  const created_at = now();
+  const entity = await createEntity(
+    context,
+    user,
+    {
+      name: parsedData.configuration.name,
+      manifest: generatedManifest,
+      target_entity_type,
+      slug: slugify(parsedData.configuration.name),
+      created_at,
+      updated_at: created_at,
+      default: false,
+      enabled: false,
+    },
+    ENTITY_TYPE_CUSTOM_VIEW,
+  );
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'create',
+    event_access: 'extended',
+    message: `import ${entity.name} custom view`,
+    context_data: {
+      id: entity.id,
+      entity_type: ENTITY_TYPE_CUSTOM_VIEW,
+      input: sanitizeElementForPublishAction(entity),
+    },
+  });
+  await notify(BUS_TOPICS[ENTITY_TYPE_CUSTOM_VIEW].ADDED_TOPIC, entity, user);
+  return entity;
 };

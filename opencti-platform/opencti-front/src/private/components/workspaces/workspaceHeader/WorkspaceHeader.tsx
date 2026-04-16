@@ -3,7 +3,6 @@ import fileDownload from 'js-file-download';
 import { graphql, useFragment } from 'react-relay';
 import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
-import handleExportJson from 'src/private/components/workspaces/workspaceExportHandler';
 import { fetchQuery } from 'src/relay/environment';
 import Security from 'src/utils/Security';
 import { nowUTC } from 'src/utils/Time';
@@ -52,6 +51,7 @@ type WorkspaceHeaderProps = {
   };
   handleAddWidget?: () => void;
   handleImportWidget?: (widgetFile: File) => void;
+  handleExport?: (workspace: { id: string; name: string }) => void;
 };
 
 const WorkspaceHeader = ({
@@ -60,12 +60,13 @@ const WorkspaceHeader = ({
   adjust = () => {},
   handleAddWidget = () => {},
   handleImportWidget = () => {},
+  handleExport = () => {},
 }: WorkspaceHeaderProps) => {
   const { t_i18n } = useFormatter();
   const workspace = useFragment(workspaceHeaderFragment, data);
   const { canEdit } = useGetCurrentUserAccessRight(workspace.currentUserAccessRight);
 
-  const handleExportDashboard = () => handleExportJson(workspace);
+  const handleExportDashboard = () => handleExport(workspace);
   const handleDownloadAsStixReport = () => {
     fetchQuery(workspaceHeaderToStixReportBundleQuery, { id: workspace.id })
       .toPromise()

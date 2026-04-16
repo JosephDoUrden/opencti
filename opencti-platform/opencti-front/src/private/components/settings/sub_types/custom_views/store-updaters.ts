@@ -1,6 +1,7 @@
 import { RecordSourceSelectorProxy } from 'relay-runtime';
 import type { useCustomViewAdd_Mutation$data } from './__generated__/useCustomViewAdd_Mutation.graphql';
 import type { useCustomViewDuplicate_Mutation$data } from './__generated__/useCustomViewDuplicate_Mutation.graphql';
+import type { useCustomViewImport_Mutation$data } from './__generated__/useCustomViewImport_Mutation.graphql';
 
 /**
  * Updates the Relay store after a successful custom view creation in order
@@ -9,13 +10,24 @@ import type { useCustomViewDuplicate_Mutation$data } from './__generated__/useCu
  * without the need to refresh.
  */
 export const customViewsDisplayContextUpdater = (
-  store: RecordSourceSelectorProxy<useCustomViewAdd_Mutation$data> | RecordSourceSelectorProxy<useCustomViewDuplicate_Mutation$data>,
-  data: useCustomViewAdd_Mutation$data | useCustomViewDuplicate_Mutation$data | null | undefined,
+  store: RecordSourceSelectorProxy<
+    | useCustomViewAdd_Mutation$data
+    | useCustomViewDuplicate_Mutation$data
+    | useCustomViewImport_Mutation$data
+  >,
+  data:
+    | useCustomViewAdd_Mutation$data
+    | useCustomViewDuplicate_Mutation$data
+    | useCustomViewImport_Mutation$data
+    | null
+    | undefined,
 ) => {
   if (!data) {
     return;
   }
-  const result = 'customViewAdd' in data ? data.customViewAdd : data.customViewDuplicate;
+  const result = 'customViewAdd' in data
+    ? data.customViewAdd : 'customViewDuplicate' in data
+      ? data.customViewDuplicate : data.customViewConfigurationImport;
   if (!result) {
     return;
   }

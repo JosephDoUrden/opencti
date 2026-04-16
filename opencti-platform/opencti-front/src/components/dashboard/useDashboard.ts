@@ -12,12 +12,14 @@ interface useDashboardProps {
   onSave?: (entityId: string, newSerializedManifest: string, noRefresh: boolean, onCompleted: () => void) => void;
   onImportWidget?: (entityId: string, widgetConfig: unknown, serializedManifest: string) => void;
   onExportWidget?: (entityId: string, widget: { id: string; type: string }) => Promise<string>;
+  onExport?: (entityId: string) => Promise<string>;
 }
 
 function useDashboard({
   entity,
   onImportWidget,
   onExportWidget,
+  onExport,
   onSave,
 }: useDashboardProps) {
   const serializedManifest = entity?.manifest;
@@ -132,7 +134,7 @@ function useDashboard({
     onImportWidget?.(entity?.id ?? '', widgetConfig, manifestEncoded);
   };
 
-  const handleExportWidget = async (id: string, widget: { id: string; type: string }) => {
+  const handleExportWidget = (id: string, widget: { id: string; type: string }) => {
     onExportWidget?.(id, widget)
       .then((exportedWidget: string) => {
         if (!exportedWidget) {
@@ -145,6 +147,23 @@ function useDashboard({
           .toLocaleDateString('fr-FR')
           .split('/');
         const fileName = `${year}${month}${day}_octi_widget_${widget.type}.json`;
+        fileDownload(blob, fileName);
+      });
+  };
+
+  const handleExport = (dashboard: { id: string; name: string }) => {
+    onExport?.(dashboard.id)
+      .then((exportedDashboard: string) => {
+        if (!exportedDashboard) {
+          return;
+        }
+        const blob = new Blob([exportedDashboard], {
+          type: 'text/json',
+        });
+        const [day, month, year] = new Date()
+          .toLocaleDateString('fr-FR')
+          .split('/');
+        const fileName = `${year}${month}${day}_octi_dashboard_${dashboard.name}.json`;
         fileDownload(blob, fileName);
       });
   };
@@ -220,6 +239,7 @@ function useDashboard({
     handleLayoutChange,
     handleImportWidget,
     handleExportWidget,
+    handleExport,
     idToResize,
     handleResize,
     config,

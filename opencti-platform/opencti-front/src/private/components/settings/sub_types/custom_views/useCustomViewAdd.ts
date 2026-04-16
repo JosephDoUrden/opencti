@@ -1,8 +1,8 @@
 import { graphql } from 'react-relay';
 import { useState } from 'react';
-import { RecordSourceSelectorProxy } from 'relay-runtime';
-import { useCustomViewAdd_Mutation, useCustomViewAdd_Mutation$data } from './__generated__/useCustomViewAdd_Mutation.graphql';
+import { useCustomViewAdd_Mutation } from './__generated__/useCustomViewAdd_Mutation.graphql';
 import useApiMutation from '../../../../../utils/hooks/useApiMutation';
+import { customViewsDisplayContextUpdater } from './store-updaters';
 
 const customViewAddMutation = graphql`
   mutation useCustomViewAdd_Mutation($input: CustomViewAddInput!) {
