@@ -29,7 +29,7 @@ import { now } from '../../utils/format';
 import { publishUserAction } from '../../listener/UserActionListener';
 import { notify } from '../../database/redis';
 import { BUS_TOPICS } from '../../config/conf';
-import { processImportWidgetConfiguration, sanitizeElementForPublishAction } from '../workspace/workspace-domain';
+import { exportWidget, processImportWidgetConfiguration, sanitizeElementForPublishAction } from '../workspace/workspace-domain';
 
 /**
  * Exclusion list: entity types not capable of
@@ -177,14 +177,20 @@ export const editCustomView = async (
   customViewId: string,
   input: EditInput[],
 ) => {
+  const nameInput = input.find((i) => i.key === 'name');
   const { element } = await updateAttribute<StoreEntityCustomView>(
     context,
     user,
     customViewId,
     ENTITY_TYPE_CUSTOM_VIEW,
-    input,
+    [
+      ...input,
+      ...(nameInput ? [{
+        key: 'slug',
+        value: [slugify(nameInput.value[0])],
+      }] : []),
+    ],
   );
-
   await publishUserAction({
     user,
     event_type: 'mutation',
@@ -194,7 +200,11 @@ export const editCustomView = async (
     context_data: { id: element.id, entity_type: ENTITY_TYPE_CUSTOM_VIEW, input },
   });
 
-  return notify(BUS_TOPICS[ENTITY_TYPE_CUSTOM_VIEW].EDIT_TOPIC, element, user);
+  await notify(BUS_TOPICS[ENTITY_TYPE_CUSTOM_VIEW].EDIT_TOPIC, element, user);
+  return {
+    ...element,
+    path: computeCustomViewPath(element),
+  };
 };
 
 export const customViewImportWidgetConfiguration = async (
@@ -228,5 +238,15 @@ export const customViewImportWidgetConfiguration = async (
       input: sanitizeElementForPublishAction(element),
     },
   });
-  return notify(BUS_TOPICS[ENTITY_TYPE_CUSTOM_VIEW].EDIT_TOPIC, element, user);
+  await notify(BUS_TOPICS[ENTITY_TYPE_CUSTOM_VIEW].EDIT_TOPIC, element, user);
+  return element;
+};
+
+export const exportCustomViewWidget = (
+  auth: AuthContext,
+  user: AuthUser,
+  customView: BasicStoreEntityCustomView,
+  widgetId: string,
+) => {
+  return exportWidget(auth, user, customView, widgetId);
 };

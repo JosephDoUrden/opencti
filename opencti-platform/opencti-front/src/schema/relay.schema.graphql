@@ -16190,6 +16190,7 @@ type CustomView implements InternalObject & BasicObject {
   manifest: String
   path: String!
   target_entity_type: String!
+  toWidgetExport(widgetId: ID!): String!
 }
 
 type CustomViewsDisplayContext {

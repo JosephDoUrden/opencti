@@ -358,19 +358,7 @@ export const generateWidgetExportConfiguration = async (context: AuthContext, us
   if (workspace.type !== 'dashboard') {
     throw FunctionalError('WORKSPACE_EXPORT_INCOMPATIBLE_TYPE', { type: workspace.type });
   }
-  const parsedManifest = fromB64(workspace.manifest ?? '{}');
-  if (parsedManifest && isNotEmptyField(parsedManifest.widgets) && parsedManifest.widgets[widgetId]) {
-    const widgetDefinition = parsedManifest.widgets[widgetId];
-    delete widgetDefinition.id; // Remove current widget id
-    await convertWidgetsIds(context, user, [widgetDefinition], 'internal');
-    const exportConfigration = {
-      openCTI_version: pjson.version,
-      type: 'widget',
-      configuration: toB64(widgetDefinition) as string,
-    };
-    return JSON.stringify(exportConfigration);
-  }
-  throw FunctionalError('WIDGET_EXPORT_NOT_FOUND', { workspace: workspace.id, widget: widgetId });
+  return exportWidget(context, user, workspace, widgetId);
 };
 
 export const workspaceImportConfiguration = async (context: AuthContext, user: AuthUser, file: Promise<FileHandle>) => {
@@ -467,6 +455,27 @@ export const processImportWidgetConfiguration = async (
     updatedManifest,
     importedWidgetId,
   };
+};
+
+interface DashboardLike {
+  id: string;
+  manifest?: string | undefined | null;
+}
+
+export const exportWidget = async (context: AuthContext, user: AuthUser, entity: DashboardLike, widgetId: string) => {
+  const parsedManifest = fromB64(entity.manifest ?? '{}');
+  if (parsedManifest && isNotEmptyField(parsedManifest.widgets) && parsedManifest.widgets[widgetId]) {
+    const widgetDefinition = parsedManifest.widgets[widgetId];
+    delete widgetDefinition.id; // Remove current widget id
+    await convertWidgetsIds(context, user, [widgetDefinition], 'internal');
+    const exportConfigration = {
+      openCTI_version: pjson.version,
+      type: 'widget',
+      configuration: toB64(widgetDefinition) as string,
+    };
+    return JSON.stringify(exportConfigration);
+  }
+  throw FunctionalError('WIDGET_EXPORT_NOT_FOUND', { workspace: entity.id, widget: widgetId });
 };
 
 export const workspaceImportWidgetConfiguration = async (

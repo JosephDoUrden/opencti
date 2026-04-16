@@ -6446,7 +6446,13 @@ export type CustomView = BasicObject & InternalObject & {
   slug: Scalars['String']['output'];
   standard_id: Scalars['String']['output'];
   target_entity_type: Scalars['String']['output'];
+  toWidgetExport: Scalars['String']['output'];
   updated_at: Scalars['DateTime']['output'];
+};
+
+
+export type CustomViewToWidgetExportArgs = {
+  widgetId: Scalars['ID']['input'];
 };
 
 export type CustomViewAddInput = {
@@ -42941,6 +42947,7 @@ export type CustomViewResolvers<ContextType = any, ParentType extends ResolversP
   slug?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   standard_id?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   target_entity_type?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  toWidgetExport?: Resolver<ResolversTypes['String'], ParentType, ContextType, RequireFields<CustomViewToWidgetExportArgs, 'widgetId'>>;
   updated_at?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 }>;

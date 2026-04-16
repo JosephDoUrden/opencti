@@ -13,6 +13,7 @@ type CustomView implements InternalObject & BasicObject {
     manifest: String
     path: String! # Derived field, not stored in DB
     target_entity_type: String!
+    toWidgetExport(widgetId: ID!): String! @auth(for: [SETTINGS_SETCUSTOMIZATION]) @ff(flags: ["CUSTOM_VIEW"])
 }
 
 type CustomViewsDisplayContext {

@@ -8,6 +8,7 @@ import {
   computeCustomViewPath,
   getCustomViewById,
   customViewImportWidgetConfiguration,
+  exportCustomViewWidget,
 } from './customView-domain';
 
 const customViewResolver: Resolvers = {
@@ -28,6 +29,9 @@ const customViewResolver: Resolvers = {
   CustomView: {
     path: (customView) => {
       return computeCustomViewPath(customView);
+    },
+    toWidgetExport: (customView, { widgetId }, context) => {
+      return exportCustomViewWidget(context, context.user, customView, widgetId);
     },
   },
   Mutation: {
