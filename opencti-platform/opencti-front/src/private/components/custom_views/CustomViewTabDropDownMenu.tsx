@@ -12,7 +12,7 @@ interface CustomViewTabDropDownMenuProps {
 }
 
 const CustomViewTabDropDownMenu = ({ displayMode, customViews, dropDownMenuState, currentCustomViewMenuItem }: CustomViewTabDropDownMenuProps) => {
-  const { anchorEl, isOpen, onClose } = dropDownMenuState;
+  const { anchorEl, isOpen, onClose, close } = dropDownMenuState;
   if (displayMode !== 'dropdown') {
     return null;
   }
@@ -30,6 +30,7 @@ const CustomViewTabDropDownMenu = ({ displayMode, customViews, dropDownMenuState
             role="link"
             component={Link}
             to={path}
+            onClick={close}
             sx={{
               '&.Mui-selected': {
                 boxShadow: 'none',

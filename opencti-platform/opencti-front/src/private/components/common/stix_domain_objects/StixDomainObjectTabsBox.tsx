@@ -44,7 +44,7 @@ interface TabInfo {
 // Order is important, will be reflected in the UI.
 const TABS_INFO: readonly TabInfo[] = [{
   tab: 'overview',
-  path: '',
+  path: 'overview',
   label: 'Overview',
 }, {
   tab: 'result',
@@ -106,7 +106,7 @@ const TabsWithCustomViews = ({
 
   return (
     <>
-      <Tabs value={currentCustomViewTab ?? currentTab}>
+      <Tabs value={(currentCustomViewTab ?? currentTab) || false}>
         {children}
         <CustomViewTab
           value={CUSTOM_VIEW_TAB_VALUE}
@@ -166,7 +166,7 @@ const StixDomainObjectTabsBox = (props: StixDomainObjectTabsBoxProps) => {
           {staticTabs}
         </TabsWithCustomViews>
       ) : (
-        <Tabs value={currentTab}>
+        <Tabs value={currentTab || false}>
           {staticTabs}
         </Tabs>
       )}

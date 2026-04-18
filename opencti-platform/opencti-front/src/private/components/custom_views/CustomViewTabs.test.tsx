@@ -100,6 +100,7 @@ describe('useCustomViewTabs', () => {
               name: customViewDisplayName,
               path: customViewPath,
               enabled: true,
+              default: false,
             }],
           }],
         }),
@@ -131,11 +132,13 @@ describe('useCustomViewTabs', () => {
               name: 'My first custom view',
               path: 'some-path',
               enabled: true,
+              default: false,
             }, {
               id: '90ebf22f-2c36-4836-b21a-e114ed4ca2ab',
               name: 'My second custom view',
               path: 'some-other-path',
               enabled: true,
+              default: false,
             }],
           }],
         }),
@@ -156,7 +159,7 @@ describe('useCustomViewTabs', () => {
     );
   });
 
-  it('does not renders another tab when custom view available but for other entity type', () => {
+  it('does not render another tab when custom view available but for other entity type', () => {
     const customViewDisplayName = 'My custom view';
     const customViewPath = 'some-path';
     testRender(
@@ -176,6 +179,7 @@ describe('useCustomViewTabs', () => {
               name: customViewDisplayName,
               path: customViewPath,
               enabled: true,
+              default: false,
             }],
           }],
         }),
