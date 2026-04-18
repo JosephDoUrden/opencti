@@ -184,6 +184,7 @@ export const editCustomView = async (
       }] : []),
     ],
   );
+  console.log(JSON.stringify(element));
   await publishUserAction({
     user,
     event_type: 'mutation',
@@ -194,10 +195,7 @@ export const editCustomView = async (
   });
 
   await notify(BUS_TOPICS[ENTITY_TYPE_CUSTOM_VIEW].EDIT_TOPIC, element, user);
-  return {
-    ...element,
-    path: computeCustomViewPath(element),
-  };
+  return element;
 };
 
 export const customViewImportWidgetConfiguration = async (

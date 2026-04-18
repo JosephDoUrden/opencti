@@ -8,10 +8,13 @@ import MarkdownField from '../../../../../components/fields/markdownField/Markdo
 import { useFormatter } from '../../../../../components/i18n';
 import { fieldSpacingContainerStyle } from '../../../../../utils/field';
 import { useEffect, useRef } from 'react';
+import SwitchField from '../../../../../components/fields/SwitchField';
+import { Stack } from '@mui/material';
 
 export interface CustomViewFormInputs {
   name: string;
   description?: string | null;
+  enabled?: boolean | null;
 }
 
 export type CustomViewFormInputKeys = keyof CustomViewFormInputs;
@@ -19,6 +22,7 @@ export type CustomViewFormInputKeys = keyof CustomViewFormInputs;
 const DEFAULT_VALUES: CustomViewFormInputs = {
   name: '',
   description: null,
+  enabled: false,
 };
 
 interface CustomViewFormProps {
@@ -38,13 +42,18 @@ const CustomViewForm = ({
 }: CustomViewFormProps) => {
   const { t_i18n } = useFormatter();
 
-  const validation = Yup.object().shape({
+  const validators = {
     name: Yup.string().trim().required(t_i18n('This field is required')),
     description: Yup.string().nullable(),
-  });
+    enabled: Yup.boolean().nullable(),
+  };
 
-  const handleFieldSubmit = (setSubmitting: (v: boolean) => void) => (name: string, value: unknown) => {
-    onSubmitField(name, value);
+  const validation = Yup.object().shape(validators);
+
+  const handleFieldSubmit = (
+    setSubmitting: (v: boolean) => void,
+  ) => (name: keyof typeof validators, value: unknown) => {
+    onSubmitField(name, validators[name].cast(value));
     setSubmitting(false);
   };
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -65,44 +74,53 @@ const CustomViewForm = ({
       {({ submitForm, handleReset, isSubmitting, setSubmitting }) => {
         return (
           <Form>
-            <Field
-              component={TextField}
-              name="name"
-              label={t_i18n('Name')}
-              fullWidth={true}
-              required
-              inputRef={nameInputRef}
-              onSubmit={handleFieldSubmit(setSubmitting)}
-            />
-            <Field
-              component={MarkdownField}
-              name="description"
-              label={t_i18n('Description')}
-              style={fieldSpacingContainerStyle}
-              multiline={true}
-              rows="4"
-              onSubmit={handleFieldSubmit(setSubmitting)}
-            />
-            {!isEdition && (
-              <FormButtonContainer>
-                <Button
-                  variant="secondary"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    handleReset();
-                    onClose();
-                  }}
-                >
-                  {t_i18n('Cancel')}
-                </Button>
-                <Button
-                  onClick={submitForm}
-                  disabled={isSubmitting}
-                >
-                  {t_i18n('Create')}
-                </Button>
-              </FormButtonContainer>
-            )}
+            <Stack gap={1}>
+              <Field
+                component={TextField}
+                name="name"
+                label={t_i18n('Name')}
+                fullWidth={true}
+                required
+                inputRef={nameInputRef}
+                onSubmit={handleFieldSubmit(setSubmitting)}
+              />
+              <Field
+                component={MarkdownField}
+                name="description"
+                label={t_i18n('Description')}
+                style={fieldSpacingContainerStyle}
+                multiline={true}
+                rows="4"
+                onSubmit={handleFieldSubmit(setSubmitting)}
+              />
+              <Field
+                component={SwitchField}
+                type="checkbox"
+                name="enabled"
+                label={t_i18n('Make this view visible to users')}
+                onChange={handleFieldSubmit(setSubmitting)}
+              />
+              {!isEdition && (
+                <FormButtonContainer>
+                  <Button
+                    variant="secondary"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      handleReset();
+                      onClose();
+                    }}
+                  >
+                    {t_i18n('Cancel')}
+                  </Button>
+                  <Button
+                    onClick={submitForm}
+                    disabled={isSubmitting}
+                  >
+                    {t_i18n('Create')}
+                  </Button>
+                </FormButtonContainer>
+              )}
+            </Stack>
           </Form>
         );
       }}
