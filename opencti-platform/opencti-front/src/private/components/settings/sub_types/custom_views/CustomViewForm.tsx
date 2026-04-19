@@ -7,6 +7,7 @@ import FormButtonContainer from '../../../../../components/common/form/FormButto
 import MarkdownField from '../../../../../components/fields/MarkdownField';
 import { useFormatter } from '../../../../../components/i18n';
 import { fieldSpacingContainerStyle } from '../../../../../utils/field';
+import { useEffect, useRef } from 'react';
 
 export interface CustomViewFormInputs {
   name: string;
@@ -37,6 +38,12 @@ const CustomViewForm = ({
     name: '',
     description: null,
   };
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (nameInputRef.current && !isEdition) {
+      nameInputRef.current.focus();
+    }
+  }, []);
 
   return (
     <Formik<CustomViewFormInputs>
@@ -55,6 +62,7 @@ const CustomViewForm = ({
               label={t_i18n('Name')}
               fullWidth={true}
               required
+              inputRef={nameInputRef}
             />
             <Field
               component={MarkdownField}
