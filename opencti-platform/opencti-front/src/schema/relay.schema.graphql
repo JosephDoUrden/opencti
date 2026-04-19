@@ -9817,6 +9817,7 @@ type Query {
   customViewsDisplayContext: [CustomViewsDisplayContext!]
   customViewDisplay(id: ID!): CustomView
   customViewsSettings(entityType: String!): CustomViewsSettings!
+  customView(id: ID!): CustomView
   taxiiCollection(id: String!): TaxiiCollection
   taxiiCollections(first: Int, after: ID, orderBy: TaxiiCollectionOrdering, orderMode: OrderingMode, search: String, filters: FilterGroup): TaxiiCollectionConnection
   feed(id: String!): Feed
@@ -10760,6 +10761,8 @@ type Mutation {
   ldapProviderEdit(id: ID!, input: LdapInput!): AuthenticationProvider
   ldapProviderDelete(id: ID!): ID
   customViewAdd(input: CustomViewAddInput!): CustomView!
+  customViewEdit(id: ID!, input: [EditInput!]!): CustomView
+  customViewWidgetConfigurationImport(id: ID!, input: ImportConfigurationInput!): CustomView
   taxiiCollectionAdd(input: TaxiiCollectionAddInput!): TaxiiCollection
   taxiiCollectionEdit(id: ID!): TaxiiCollectionEditMutations
   feedAdd(input: FeedAddInput!): Feed
@@ -16192,6 +16195,7 @@ type CustomView implements InternalObject & BasicObject {
   manifest: String
   path: String!
   target_entity_type: String!
+  toWidgetExport(widgetId: ID!): String!
 }
 
 type CustomViewsDisplayContext {
