@@ -6,7 +6,7 @@ import { Route, Routes } from 'react-router-dom';
 
 const CUSTOM_VIEW_MOCK_CONTENT = 'A great custom view page';
 
-vi.mock('./RootCustomView', () => ({
+vi.mock('./CustomView', () => ({
   default: () => <span>{CUSTOM_VIEW_MOCK_CONTENT}</span>,
   __esModule: true,
 }));
