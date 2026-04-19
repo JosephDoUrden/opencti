@@ -27,7 +27,7 @@ const CustomViewsSettingsDataTable = ({
   targetType,
 }: CustomViewsSettingsDataTableProps) => {
   const { t_i18n } = useFormatter();
-  const getCustomViewLink = (entry: CustomViewsSettingsEntry) => `custom-views/${entry.id}`;
+  const getCustomViewLink = (entry: CustomViewsSettingsEntry) => `/dashboard/settings/customization/entity_types/${targetType}/custom-views/${entry.id}`;
   const storageKey = `custom-views-${targetType}`;
   const { sortedData: sortedCustomViews } = useDataTableLocalSort({
     data: customViews,
