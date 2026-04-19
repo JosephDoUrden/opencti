@@ -16935,6 +16935,7 @@ export type Mutation = {
   customViewDuplicate?: Maybe<CustomView>;
   customViewEdit?: Maybe<CustomView>;
   customViewWidgetConfigurationImport?: Maybe<CustomView>;
+  customViewDelete: Scalars['ID']['output'];
   dataComponentAdd?: Maybe<DataComponent>;
   dataComponentContextClean?: Maybe<DataComponent>;
   dataComponentContextPatch?: Maybe<DataComponent>;
@@ -17768,6 +17769,11 @@ export type MutationCustomViewEditArgs = {
 export type MutationCustomViewWidgetConfigurationImportArgs = {
   id: Scalars['ID']['input'];
   input: ImportConfigurationInput;
+};
+
+
+export type MutationCustomViewDeleteArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -46639,6 +46645,7 @@ export type MutationResolvers<ContextType = any, ParentType extends ResolversPar
   customViewDuplicate?: Resolver<Maybe<ResolversTypes['CustomView']>, ParentType, ContextType, RequireFields<MutationCustomViewDuplicateArgs, 'input'>>;
   customViewEdit?: Resolver<Maybe<ResolversTypes['CustomView']>, ParentType, ContextType, RequireFields<MutationCustomViewEditArgs, 'id' | 'input'>>;
   customViewWidgetConfigurationImport?: Resolver<Maybe<ResolversTypes['CustomView']>, ParentType, ContextType, RequireFields<MutationCustomViewWidgetConfigurationImportArgs, 'id' | 'input'>>;
+  customViewDelete?: Resolver<ResolversTypes['ID'], ParentType, ContextType, RequireFields<MutationCustomViewDeleteArgs, 'id'>>;
   dataComponentAdd?: Resolver<Maybe<ResolversTypes['DataComponent']>, ParentType, ContextType, RequireFields<MutationDataComponentAddArgs, 'input'>>;
   dataComponentContextClean?: Resolver<Maybe<ResolversTypes['DataComponent']>, ParentType, ContextType, RequireFields<MutationDataComponentContextCleanArgs, 'id'>>;
   dataComponentContextPatch?: Resolver<Maybe<ResolversTypes['DataComponent']>, ParentType, ContextType, RequireFields<MutationDataComponentContextPatchArgs, 'id' | 'input'>>;
