@@ -16197,6 +16197,7 @@ type CustomView implements InternalObject & BasicObject {
   manifest: String
   path: String!
   target_entity_type: String!
+  enabled: Boolean
   toWidgetExport(widgetId: ID!): String!
 }
 
@@ -16216,6 +16217,7 @@ input CustomViewAddInput {
   description: String
   manifest: String
   target_entity_type: String!
+  enabled: Boolean
 }
 
 input CustomViewDuplicateInput {
@@ -16224,6 +16226,7 @@ input CustomViewDuplicateInput {
   description: String
   manifest: String
   target_entity_type: String!
+  enabled: Boolean
 }
 
 type TaxiiCollection {
