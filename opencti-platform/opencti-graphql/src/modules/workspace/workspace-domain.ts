@@ -37,7 +37,7 @@ import { createInternalObject, editInternalObject } from '../../domain/internalO
 
 export const PLATFORM_DASHBOARD = 'cf093b57-713f-404b-a210-a1c5c8cb3791';
 
-export const sanitizeElementForPublishAction = (element: BasicStoreEntityWorkspace) => {
+export const sanitizeElementForPublishAction = <T>(element: T) => {
   // Because manifest can be huge we remove this data from activity logs.
   return { ...element, manifest: undefined };
 };
@@ -425,10 +425,9 @@ interface WidgetConfigImportData extends ConfigImportData {
   configuration?: string; // widget definition in base64.
 }
 
-export const workspaceImportWidgetConfiguration = async (
+export const processImportWidgetConfiguration = async (
   context: AuthContext,
   user: AuthUser,
-  workspaceId: string,
   input: ImportWidgetInput,
 ) => {
   const parsedData = await extractContentFrom<WidgetConfigImportData>(input.file);
@@ -464,6 +463,23 @@ export const workspaceImportWidgetConfiguration = async (
     },
   };
   const updatedManifest = toB64(updatedObjects);
+  return {
+    updatedManifest,
+    importedWidgetId,
+  };
+};
+
+export const workspaceImportWidgetConfiguration = async (
+  context: AuthContext,
+  user: AuthUser,
+  workspaceId: string,
+  input: ImportWidgetInput,
+) => {
+  const { updatedManifest, importedWidgetId } = await processImportWidgetConfiguration(
+    context,
+    user,
+    input,
+  );
   const { element } = await updateAttribute<StoreEntityWorkspace>(
     context,
     user,

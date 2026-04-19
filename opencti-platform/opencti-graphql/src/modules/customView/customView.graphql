@@ -51,6 +51,7 @@ type Query {
     customViewsSettings(
         entityType: String!
     ): CustomViewsSettings! @auth(for: [SETTINGS_SETCUSTOMIZATION]) @ff(flags: ["CUSTOM_VIEW"])
+    customView(id: ID!): CustomView @auth(for: [SETTINGS_SETCUSTOMIZATION]) @ff(flags: ["CUSTOM_VIEW"])
 }
 
 # Mutations
@@ -59,5 +60,7 @@ type Mutation {
 
     # Add a new custom view
     customViewAdd(input: CustomViewAddInput!): CustomView! @auth(for: [SETTINGS_SETCUSTOMIZATION])
+    customViewEdit(id: ID!, input: [EditInput!]!): CustomView @auth(for: [SETTINGS_SETCUSTOMIZATION])
+    customViewWidgetConfigurationImport(id: ID!, input: ImportConfigurationInput!): CustomView @auth(for: [SETTINGS_SETCUSTOMIZATION])
 }
 

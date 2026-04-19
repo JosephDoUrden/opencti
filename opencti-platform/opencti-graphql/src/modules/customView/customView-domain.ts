@@ -1,8 +1,15 @@
 import slugify from 'slug';
 import { fullEntitiesList, storeLoadById } from '../../database/middleware-loader';
 import type { AuthContext, AuthUser } from '../../types/user';
-import { ENTITY_TYPE_CUSTOM_VIEW, type BasicStoreEntityCustomView } from './customView-types';
-import { FilterMode, type CustomViewAddInput, type CustomViewDisplayContext, type CustomViewsDisplayContext } from '../../generated/graphql';
+import { ENTITY_TYPE_CUSTOM_VIEW, type BasicStoreEntityCustomView, type StoreEntityCustomView } from './customView-types';
+import {
+  FilterMode,
+  type CustomViewAddInput,
+  type CustomViewDisplayContext,
+  type CustomViewsDisplayContext,
+  type EditInput,
+  type ImportWidgetInput,
+} from '../../generated/graphql';
 import {
   ENTITY_TYPE_CONTAINER_NOTE,
   ENTITY_TYPE_CONTAINER_OBSERVED_DATA,
@@ -17,8 +24,12 @@ import { ENTITY_TYPE_CONTAINER_FEEDBACK } from '../case/feedback/feedback-types'
 import { ABSTRACT_STIX_CORE_RELATIONSHIP, ABSTRACT_STIX_CYBER_OBSERVABLE, ABSTRACT_STIX_DOMAIN_OBJECT } from '../../schema/general';
 import { schemaTypesDefinition } from '../../schema/schema-types';
 import { ENTITY_HASHED_OBSERVABLE_ARTIFACT } from '../../schema/stixCyberObservable';
-import { createEntity } from '../../database/middleware';
+import { createEntity, updateAttribute } from '../../database/middleware';
 import { now } from '../../utils/format';
+import { publishUserAction } from '../../listener/UserActionListener';
+import { notify } from '../../database/redis';
+import { BUS_TOPICS } from '../../config/conf';
+import { processImportWidgetConfiguration, sanitizeElementForPublishAction } from '../workspace/workspace-domain';
 
 /**
  * Exclusion list: entity types not capable of
@@ -98,6 +109,15 @@ export const getCustomViewsDisplayContext = async (context: AuthContext, user: A
 
 // Settings Use Cases (admin users)
 
+export const getCustomViewById = async (context: AuthContext, user: AuthUser, customViewId: string) => {
+  return storeLoadById<BasicStoreEntityCustomView>(
+    context,
+    user,
+    customViewId,
+    ENTITY_TYPE_CUSTOM_VIEW,
+  );
+};
+
 export const getCustomViewsSettings = async (
   context: AuthContext,
   user: AuthUser,
@@ -149,4 +169,64 @@ export const addCustomView = async (
     ENTITY_TYPE_CUSTOM_VIEW,
   );
   return entity;
+};
+
+export const editCustomView = async (
+  context: AuthContext,
+  user: AuthUser,
+  customViewId: string,
+  input: EditInput[],
+) => {
+  const { element } = await updateAttribute<StoreEntityCustomView>(
+    context,
+    user,
+    customViewId,
+    ENTITY_TYPE_CUSTOM_VIEW,
+    input,
+  );
+
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'update',
+    event_access: 'administration',
+    message: `updates \`${input.map((i) => i.key).join(', ')}\` for custom view ${element.name}`,
+    context_data: { id: element.id, entity_type: ENTITY_TYPE_CUSTOM_VIEW, input },
+  });
+
+  return notify(BUS_TOPICS[ENTITY_TYPE_CUSTOM_VIEW].EDIT_TOPIC, element, user);
+};
+
+export const customViewImportWidgetConfiguration = async (
+  context: AuthContext,
+  user: AuthUser,
+  customViewId: string,
+  input: ImportWidgetInput,
+) => {
+  const { updatedManifest, importedWidgetId } = await processImportWidgetConfiguration(
+    context,
+    user,
+    input,
+  );
+  const { element } = await updateAttribute<StoreEntityCustomView>(
+    context,
+    user,
+    customViewId,
+    ENTITY_TYPE_CUSTOM_VIEW,
+    [{ key: 'manifest', value: [updatedManifest] }],
+  );
+
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'create',
+    event_access: 'extended',
+    message: `import widget (id : ${importedWidgetId}) in custom view (id : ${customViewId})`,
+    context_data: {
+      id: customViewId,
+      entity_type: ENTITY_TYPE_CUSTOM_VIEW,
+      input: sanitizeElementForPublishAction(element),
+    },
+  });
+  return notify(BUS_TOPICS[ENTITY_TYPE_CUSTOM_VIEW].EDIT_TOPIC, element, user);
 };
