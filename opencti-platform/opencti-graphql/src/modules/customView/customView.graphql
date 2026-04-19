@@ -12,7 +12,6 @@ type CustomView implements InternalObject & BasicObject {
     slug: String!
     manifest: String
     target_entity_type: String!
-    authorizedMembers: [MemberAccess!]!
 }
 
 type CustomViewDisplay {
@@ -48,7 +47,7 @@ input CustomViewAddInput {
     description: String
     manifest: String
     target_entity_type: String!
-    authorizedMembers: [MemberAccessInput!]
+    # authorizedMembers: [MemberAccessInput!]
 }
 
 # Queries
