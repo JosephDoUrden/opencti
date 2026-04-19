@@ -4,7 +4,7 @@ import type { CustomViewsInfo } from './CustomViews-types';
 
 export const CUSTOM_VIEW_TAB_VALUE = 'custom-view';
 
-function matchPath(customViews: CustomViewsInfo) {
+function matchPath(customViews: CustomViewsInfo[]) {
   return (fullPath: string, basePath: string) => {
     const current = getCurrentTab(fullPath, basePath);
     if (customViews.find(({ path }) => path === current)) {
@@ -26,9 +26,10 @@ export const useCustomViews = (entityType: string) => {
     return NO_CUSTOM_VIEWS;
   }
   const customViews = customViewsContextForType.custom_views_info ?? [];
-  const getCurrentCustomViewTab = matchPath(customViews);
+  const nonNullCustomViews = customViews.filter((c) => !!c);
+  const getCurrentCustomViewTab = matchPath(nonNullCustomViews);
   return {
-    customViews,
+    customViews: nonNullCustomViews,
     getCurrentCustomViewTab,
   };
 };

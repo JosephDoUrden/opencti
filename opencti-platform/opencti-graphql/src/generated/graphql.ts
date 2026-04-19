@@ -6471,14 +6471,14 @@ export type CustomViewDuplicateInput = {
 
 export type CustomViewsDisplayContext = {
   __typename?: 'CustomViewsDisplayContext';
-  custom_views_info: Array<CustomView>;
+  custom_views_info: Array<Maybe<CustomView>>;
   entity_type: Scalars['String']['output'];
 };
 
 export type CustomViewsSettings = {
   __typename?: 'CustomViewsSettings';
   canEntityTypeHaveCustomViews: Scalars['Boolean']['output'];
-  customViews: Array<CustomView>;
+  customViews: Array<Maybe<CustomView>>;
 };
 
 export type DataComponent = BasicObject & StixCoreObject & StixDomainObject & StixObject & {

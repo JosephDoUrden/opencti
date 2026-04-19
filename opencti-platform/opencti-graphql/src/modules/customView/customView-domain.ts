@@ -275,7 +275,7 @@ export async function duplicateCustomView(
   return entity;
 };
 
-export const customViewDelete = async (
+export const deleteCustomView = async (
   context: AuthContext,
   user: AuthUser,
   customViewId: string,

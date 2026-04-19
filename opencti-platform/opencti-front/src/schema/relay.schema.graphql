@@ -16197,12 +16197,12 @@ type CustomView implements InternalObject & BasicObject {
 
 type CustomViewsDisplayContext {
   entity_type: String!
-  custom_views_info: [CustomView!]!
+  custom_views_info: [CustomView]!
 }
 
 type CustomViewsSettings {
   canEntityTypeHaveCustomViews: Boolean!
-  customViews: [CustomView!]!
+  customViews: [CustomView]!
 }
 
 input CustomViewAddInput {

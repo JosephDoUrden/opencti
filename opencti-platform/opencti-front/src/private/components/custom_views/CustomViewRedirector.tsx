@@ -18,7 +18,7 @@ const CustomViewRedirector = ({ entityType, Fallback }: CustomViewRedirectorProp
     (acc, customViewInfo) => ({
       ...acc,
       [customViewInfo.id.replaceAll('-', '')]: customViewInfo,
-    }), {} as Record<string, CustomViewsInfo[number]>,
+    }), {} as Record<string, CustomViewsInfo>,
   ), [customViews]);
   return (
     <SlugRedirectHandler
