@@ -298,6 +298,7 @@ const rootPrivateQuery = graphql`
         name
         path
         enabled
+        default
       }
     }
     schemaSCOs: subTypes(type: "Stix-Cyber-Observable") {
