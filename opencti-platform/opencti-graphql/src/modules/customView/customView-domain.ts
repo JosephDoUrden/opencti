@@ -1,7 +1,8 @@
+import slugify from 'slug';
 import { fullEntitiesList, storeLoadById } from '../../database/middleware-loader';
 import type { AuthContext, AuthUser } from '../../types/user';
 import { ENTITY_TYPE_CUSTOM_VIEW, type BasicStoreEntityCustomView } from './customView-types';
-import { type CustomViewsDisplayContext, type CustomViewDisplayContext, FilterMode } from '../../generated/graphql';
+import { FilterMode, type CustomViewAddInput, type CustomViewDisplayContext, type CustomViewsDisplayContext } from '../../generated/graphql';
 import {
   ENTITY_TYPE_CONTAINER_NOTE,
   ENTITY_TYPE_CONTAINER_OBSERVED_DATA,
@@ -16,6 +17,8 @@ import { ENTITY_TYPE_CONTAINER_FEEDBACK } from '../case/feedback/feedback-types'
 import { ABSTRACT_STIX_CORE_RELATIONSHIP, ABSTRACT_STIX_CYBER_OBSERVABLE, ABSTRACT_STIX_DOMAIN_OBJECT } from '../../schema/general';
 import { schemaTypesDefinition } from '../../schema/schema-types';
 import { ENTITY_HASHED_OBSERVABLE_ARTIFACT } from '../../schema/stixCyberObservable';
+import { createEntity } from '../../database/middleware';
+import { now } from '../../utils/format';
 
 /**
  * Exclusion list: entity types not capable of
@@ -127,4 +130,25 @@ export const getCustomViewsSettings = async (
         created_at,
       })),
   };
+};
+
+export const addCustomView = async (
+  context: AuthContext,
+  user: AuthUser,
+  input: CustomViewAddInput,
+) => {
+  const created_at = now();
+  const customViewToCreate = {
+    ...input,
+    slug: slugify(input.name),
+    created_at,
+    updated_at: created_at,
+  };
+  const entity = await createEntity(
+    context,
+    user,
+    customViewToCreate,
+    ENTITY_TYPE_CUSTOM_VIEW,
+  );
+  return entity;
 };
