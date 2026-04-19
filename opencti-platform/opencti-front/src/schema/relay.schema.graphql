@@ -16190,7 +16190,6 @@ type CustomView implements InternalObject & BasicObject {
   slug: String!
   manifest: String
   target_entity_type: String!
-  authorizedMembers: [MemberAccess!]!
 }
 
 type CustomViewDisplay {
