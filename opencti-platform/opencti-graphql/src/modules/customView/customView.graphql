@@ -34,6 +34,13 @@ input CustomViewAddInput {
     # authorizedMembers: [MemberAccessInput!]
 }
 
+input CustomViewDuplicateInput {
+    name: String! @constraint(minLength: 2, format: "not-blank")
+    description: String
+    manifest: String
+    target_entity_type: String!
+}
+
 # Queries
 type Query {
     ## Platform user use cases
@@ -63,5 +70,6 @@ type Mutation {
     customViewAdd(input: CustomViewAddInput!): CustomView! @auth(for: [SETTINGS_SETCUSTOMIZATION])
     customViewEdit(id: ID!, input: [EditInput!]!): CustomView @auth(for: [SETTINGS_SETCUSTOMIZATION])
     customViewWidgetConfigurationImport(id: ID!, input: ImportConfigurationInput!): CustomView @auth(for: [SETTINGS_SETCUSTOMIZATION])
+    customViewDuplicate(input: CustomViewDuplicateInput!): CustomView @auth(for: [SETTINGS_SETCUSTOMIZATION])
 }
 

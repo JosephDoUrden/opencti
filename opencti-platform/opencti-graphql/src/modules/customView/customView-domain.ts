@@ -2,14 +2,7 @@ import slugify from 'slug';
 import { fullEntitiesList, storeLoadById } from '../../database/middleware-loader';
 import type { AuthContext, AuthUser } from '../../types/user';
 import { ENTITY_TYPE_CUSTOM_VIEW, type BasicStoreEntityCustomView, type StoreEntityCustomView } from './customView-types';
-import {
-  FilterMode,
-  type CustomViewAddInput,
-  type CustomViewDisplayContext,
-  type CustomViewsDisplayContext,
-  type EditInput,
-  type ImportWidgetInput,
-} from '../../generated/graphql';
+import { FilterMode, type CustomViewAddInput, type CustomViewDuplicateInput, type EditInput, type ImportWidgetInput } from '../../generated/graphql';
 import {
   ENTITY_TYPE_CONTAINER_NOTE,
   ENTITY_TYPE_CONTAINER_OBSERVED_DATA,
@@ -249,4 +242,35 @@ export const exportCustomViewWidget = (
   widgetId: string,
 ) => {
   return exportWidget(auth, user, customView, widgetId);
+};
+
+export async function duplicateCustomView(
+  context: AuthContext,
+  user: AuthUser,
+  input: CustomViewDuplicateInput,
+) {
+  const created_at = now();
+  const customViewToCreate = {
+    ...input,
+    slug: slugify(input.name),
+    created_at,
+    updated_at: created_at,
+  };
+  const entity = await createEntity(
+    context,
+    user,
+    customViewToCreate,
+    ENTITY_TYPE_CUSTOM_VIEW,
+  );
+  const sanitizeElement = { ...input, manifest: undefined };
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'create',
+    event_access: 'extended',
+    message: `creates custom view \`${entity.name}\` from custom-named duplication`,
+    context_data: { id: entity.id, entity_type: ENTITY_TYPE_CUSTOM_VIEW, input: sanitizeElement },
+  });
+  await notify(BUS_TOPICS[ENTITY_TYPE_CUSTOM_VIEW].ADDED_TOPIC, entity, user);
+  return entity;
 };
