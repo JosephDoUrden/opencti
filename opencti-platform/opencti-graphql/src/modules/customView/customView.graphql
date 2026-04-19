@@ -14,6 +14,7 @@ type CustomView implements InternalObject & BasicObject {
     path: String! # Derived field, not stored in DB
     target_entity_type: String!
     enabled: Boolean
+    default: Boolean
     toWidgetExport(widgetId: ID!): String! @auth(for: [SETTINGS_SETCUSTOMIZATION]) @ff(flags: ["CUSTOM_VIEW"])
 }
 
@@ -33,6 +34,7 @@ input CustomViewAddInput {
     manifest: String
     target_entity_type: String!
     enabled: Boolean
+    default: Boolean
 }
 
 input CustomViewDuplicateInput {
@@ -41,6 +43,7 @@ input CustomViewDuplicateInput {
     manifest: String
     target_entity_type: String!
     enabled: Boolean
+    default: Boolean
 }
 
 # Queries
