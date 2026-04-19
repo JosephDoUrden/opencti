@@ -1,5 +1,5 @@
 import type { Resolvers } from '../../generated/graphql';
-import { getCustomViewsSettings, getCustomViewByIdForDisplay, getCustomViewsDisplayContext, computeCustomViewPath } from './customView-domain';
+import { addCustomView, getCustomViewsSettings, getCustomViewByIdForDisplay, getCustomViewsDisplayContext, computeCustomViewPath } from './customView-domain';
 
 const customViewResolver: Resolvers = {
   Query: {
@@ -18,7 +18,11 @@ const customViewResolver: Resolvers = {
       return computeCustomViewPath(customView);
     },
   },
-  Mutation: {},
+  Mutation: {
+    customViewAdd: (_, { input }, context) => {
+      return addCustomView(context, context.user, input);
+    },
+  },
 };
 
 export default customViewResolver;

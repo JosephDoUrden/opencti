@@ -3,8 +3,9 @@ import gql from 'graphql-tag';
 import { createEntity } from '../../../../src/database/middleware';
 import { ADMIN_USER, testContext, USER_PARTICIPATE } from '../../../utils/testQuery';
 import type { CustomViewsDisplayContext } from '../../../../src/generated/graphql';
-import { queryAsUserWithSuccess, queryAsAdminWithSuccess, queryAsUserIsExpectedForbidden } from '../../../utils/testQueryHelper';
-import { CUSTOM_VIEW_ENTITY_1, CUSTOM_VIEW_ENTITY_2, CUSTOM_VIEW_ENTITY_INVALID } from './customView-fixtures';
+import { queryAsUserWithSuccess, queryAsAdminWithSuccess, queryAsUserIsExpectedForbidden, queryAsAdminWithError } from '../../../utils/testQueryHelper';
+import { CUSTOM_VIEW_ENTITY_1, CUSTOM_VIEW_ENTITY_2, CUSTOM_VIEW_ENTITY_INVALID, DASHBOARD_MANIFEST } from './customView-fixtures';
+import { ENTITY_TYPE_CONTAINER_FEEDBACK } from '../../../../src/modules/case/feedback/feedback-types';
 
 const READ_CONTEXT_QUERY = gql`
   query CustomViewsDisplayContextTest {
@@ -38,6 +39,20 @@ const READ_SETTINGS_QUERY = gql`
         created_at
         updated_at
       }
+    }
+  }
+`;
+
+const CREATE_CUSTOM_VIEW_QUERY = gql`
+  mutation CreateCustomViewTest($input: CustomViewAddInput!) {
+    customViewAdd(input: $input) {
+      id
+      name
+      description
+      path
+      target_entity_type
+      updated_at
+      created_at
     }
   }
 `;
@@ -120,7 +135,55 @@ describe('CustomView resolvers', () => {
   describe('settings use cases', () => {
     describe('customViewsSettings', () => {
       describe('when user is admin', () => {
-        it('should retrieve canEntityTypeHaveCustomViews=true and custom views for allowed entity type', async () => {
+        it('should allow creating a custom view', async () => {
+          const description = 'Some great description';
+          const manifest = DASHBOARD_MANIFEST;
+          const name = 'Custom view name';
+          const target_entity_type = 'Intrusion-Set';
+          const result = await queryAsAdminWithSuccess({
+            query: CREATE_CUSTOM_VIEW_QUERY,
+            variables: {
+              input: {
+                description,
+                manifest,
+                name,
+                target_entity_type,
+              },
+            },
+          });
+          expect(result.data.customViewAdd).toMatchObject({
+            id: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
+            name,
+            description,
+            path: `custom-view-name-${result.data.customViewAdd.id.replaceAll('-', '')}`,
+            target_entity_type,
+            created_at: expect.any(Date),
+            updated_at: expect.any(Date),
+          });
+        });
+
+        it('should return a client error when trying to create a custom view for a non-supported entity type', async () => {
+          const description = 'Some great description';
+          const manifest = DASHBOARD_MANIFEST;
+          const name = 'Custom view name';
+          const target_entity_type = ENTITY_TYPE_CONTAINER_FEEDBACK;
+          const result = await queryAsAdminWithError({
+            query: CREATE_CUSTOM_VIEW_QUERY,
+            variables: {
+              input: {
+                description,
+                manifest,
+                name,
+                target_entity_type,
+              },
+            },
+          });
+          expect(result.errors?.[0].message).toBe('Custom views cannot be created for given entity type');
+          expect(result.errors?.[0].extensions?.code).toBe('FUNCTIONAL_ERROR');
+          expect(result.errors?.[0].extensions?.data).toMatchObject({ http_status: 400 });
+        });
+
+        it('should retrieve canEntityTypeHaveCustomViews=true and custom views for alowed entity type', async () => {
           const result = await queryAsAdminWithSuccess({
             query: READ_SETTINGS_QUERY,
             variables: {
