@@ -26,7 +26,9 @@ export const useCustomViews = (entityType: string) => {
     return NO_CUSTOM_VIEWS;
   }
   const customViews = customViewsContextForType.custom_views_info ?? [];
-  const nonNullCustomViews = customViews.filter((c) => !!c);
+  const nonNullCustomViews = customViews
+    .filter((c) => !!c)
+    .filter(({ enabled }) => enabled === true);
   const getCurrentCustomViewTab = matchPath(nonNullCustomViews);
   const sortedCustomViews = [...nonNullCustomViews].sort(
     (lhs, rhs) => lhs.name.localeCompare(rhs.name),

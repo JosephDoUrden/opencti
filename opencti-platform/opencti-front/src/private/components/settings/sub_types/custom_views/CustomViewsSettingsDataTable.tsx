@@ -37,7 +37,7 @@ const CustomViewsSettingsDataTable = ({
 
   return (
     <DataTableWithoutFragment
-      icon={() => <DrawOutlinedIcon color="secondary" />}
+      icon={(customView: CustomViewsSettingsEntry) => <DrawOutlinedIcon color={customView.enabled ? 'secondary' : 'disabled'} />}
       initialValues={DEFAULT_SORT_CONFIG}
       dataColumns={DATA_COLUMNS}
       storageKey={storageKey}

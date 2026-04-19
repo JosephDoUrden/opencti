@@ -64,7 +64,7 @@ const TestWrapper = ({ entityType, basePath }: TestWrapperProps) => {
 
   return (
     <>
-      <Tabs value={currentCustomViewTab}>
+      <Tabs value={currentCustomViewTab || false}>
         {renderCustomViewTab()}
       </Tabs>
       {displayMode === 'dropdown' && (
@@ -99,6 +99,7 @@ describe('useCustomViewTabs', () => {
               id: '1504f07b-ee3f-4c09-ae66-b9550eb3abe3',
               name: customViewDisplayName,
               path: customViewPath,
+              enabled: true,
             }],
           }],
         }),
@@ -129,10 +130,12 @@ describe('useCustomViewTabs', () => {
               id: '1504f07b-ee3f-4c09-ae66-b9550eb3abe3',
               name: 'My first custom view',
               path: 'some-path',
+              enabled: true,
             }, {
               id: '90ebf22f-2c36-4836-b21a-e114ed4ca2ab',
               name: 'My second custom view',
               path: 'some-other-path',
+              enabled: true,
             }],
           }],
         }),
@@ -172,6 +175,41 @@ describe('useCustomViewTabs', () => {
               id: '1504f07b-ee3f-4c09-ae66-b9550eb3abe3',
               name: customViewDisplayName,
               path: customViewPath,
+              enabled: true,
+            }],
+          }],
+        }),
+      },
+    );
+    expect(screen.queryByRole('tab', {
+      name: new RegExp(customViewDisplayName, 'i'),
+    })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', {
+      name: /Custom view/i,
+    })).not.toBeInTheDocument();
+  });
+
+  it('does not render another tab when custom view exists but is disabled', () => {
+    const customViewDisplayName = 'My custom view';
+    const customViewPath = 'some-path';
+    testRender(
+      <TestWrapper entityType="Intrusion-Set" basePath="" />,
+      {
+        userContext: createMockUserContext({
+          settings: {
+            platform_feature_flags: [{
+              id: 'CUSTOM_VIEW',
+              enable: true,
+            }],
+          },
+          customViews: [{
+            entity_type: 'Intrusion-Set',
+            custom_views_info: [{
+              id: '1504f07b-ee3f-4c09-ae66-b9550eb3abe3',
+              name: customViewDisplayName,
+              path: customViewPath,
+              enabled: false,
+              default: false,
             }],
           }],
         }),

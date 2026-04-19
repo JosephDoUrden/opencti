@@ -18,6 +18,7 @@ const headerFragment = graphql`
     name
     description
     target_entity_type
+    enabled
     ...CustomViewKebabMenu_customView
   }
 `;

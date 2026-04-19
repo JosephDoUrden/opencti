@@ -19,6 +19,7 @@ const customViewsFragment = graphql`
       description
       created_at
       updated_at
+      enabled
     }
   }
 `;
