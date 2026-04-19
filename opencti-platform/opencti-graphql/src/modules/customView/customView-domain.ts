@@ -17,7 +17,7 @@ import { ENTITY_TYPE_CONTAINER_FEEDBACK } from '../case/feedback/feedback-types'
 import { ABSTRACT_STIX_CORE_RELATIONSHIP, ABSTRACT_STIX_CYBER_OBSERVABLE, ABSTRACT_STIX_DOMAIN_OBJECT } from '../../schema/general';
 import { schemaTypesDefinition } from '../../schema/schema-types';
 import { ENTITY_HASHED_OBSERVABLE_ARTIFACT } from '../../schema/stixCyberObservable';
-import { createEntity, updateAttribute } from '../../database/middleware';
+import { createEntity, updateAttribute, deleteElementById } from '../../database/middleware';
 import { now } from '../../utils/format';
 import { publishUserAction } from '../../listener/UserActionListener';
 import { notify } from '../../database/redis';
@@ -270,4 +270,19 @@ export async function duplicateCustomView(
   });
   await notify(BUS_TOPICS[ENTITY_TYPE_CUSTOM_VIEW].ADDED_TOPIC, entity, user);
   return entity;
+};
+
+export const deleteCustomView = async (
+  context: AuthContext,
+  user: AuthUser,
+  customViewId: string,
+) => {
+  await deleteElementById(
+    context,
+    user,
+    customViewId,
+    ENTITY_TYPE_CUSTOM_VIEW,
+  );
+
+  return customViewId;
 };
