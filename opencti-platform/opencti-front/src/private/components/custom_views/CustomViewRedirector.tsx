@@ -10,7 +10,7 @@ interface CustomViewRedirectorProps {
 }
 
 const renderMatch = (info: SlugRedirectHandlerPageInfo) =>
-  <CustomView customViewId={(info as CustomViewsInfo[number]).id} />;
+  <CustomView customViewId={(info as CustomViewsInfo).id} />;
 
 const CustomViewRedirector = ({ entityType, Fallback }: CustomViewRedirectorProps) => {
   const { customViews } = useCustomViews(entityType);
@@ -18,7 +18,7 @@ const CustomViewRedirector = ({ entityType, Fallback }: CustomViewRedirectorProp
     (acc, customViewInfo) => ({
       ...acc,
       [customViewInfo.id.replaceAll('-', '')]: customViewInfo,
-    }), {} as Record<string, CustomViewsInfo[number]>,
+    }), {} as Record<string, CustomViewsInfo>,
   ), [customViews]);
   return (
     <SlugRedirectHandler

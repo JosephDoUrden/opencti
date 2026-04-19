@@ -5,7 +5,7 @@ import { useFormatter } from '../../../../../components/i18n';
 import type { CustomViewsSettings_customViews$data } from './__generated__/CustomViewsSettings_customViews.graphql';
 import DrawOutlinedIcon from '@mui/icons-material/DrawOutlined';
 
-type CustomViewsSettingsEntry = CustomViewsSettings_customViews$data['customViews'][number];
+type CustomViewsSettingsEntry = NonNullable<CustomViewsSettings_customViews$data['customViews'][number]>;
 
 interface CustomViewsSettingsDataTableProps {
   customViews: Readonly<CustomViewsSettingsEntry[]>;

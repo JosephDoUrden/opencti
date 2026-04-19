@@ -33,6 +33,7 @@ const CustomViewsSettings = () => {
     customViewsFragment,
     customViewsSettings,
   );
+  const nonDeletedCustomViews = customViews.filter((c) => !!c);
   const [isDrawerOpen, setDrawerOpen] = useState(false);
 
   return (
@@ -56,7 +57,7 @@ const CustomViewsSettings = () => {
             </Tooltip>
           )}
         >
-          <CustomViewsSettingsDataTable customViews={customViews} targetType={subType.id} />
+          <CustomViewsSettingsDataTable customViews={nonDeletedCustomViews} targetType={subType.id} />
         </Card>
       </Grid>
       <CustomViewFormDrawer
