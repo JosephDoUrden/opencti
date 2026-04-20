@@ -4,7 +4,6 @@ type DraftEntityRead implements InternalObject & BasicObject {
     entity_type: String!
     parent_types: [String!]!
     metrics: [Metric]
-    # DraftEntityRead fields
     user_id: String!
     draft_id: String!
     entity_id: String!
