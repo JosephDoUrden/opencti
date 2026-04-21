@@ -231,6 +231,7 @@ import { deleteAllObjectFiles, moveAllFilesFromEntityToAnother, storeFileConvert
 import { getFileContent } from './raw-file-storage';
 import { getDraftContext } from '../utils/draftContext';
 import { getDraftChanges, isDraftSupportedEntity } from './draft-utils';
+import { resetDraftEntityRead } from '../modules/draftEntityRead/draftEntityRead-domain';
 import { lockResources } from '../lock/master-lock';
 import { STIX_EXT_OCTI } from '../types/stix-2-1-extensions';
 import { isRequestAccessEnabled } from '../modules/requestAccess/requestAccessUtils';
@@ -2683,6 +2684,11 @@ export const updateAttributeMetaResolved = async <T extends StoreObject>(
           updatedInstance._index = draftElementVersion._index;
           updatedInstance._id = draftElementVersion._id;
           updatedInstance.draft_ids = draftElementVersion.draft_ids;
+        }
+        // Reset read status for all users when entity is re-modified in the draft
+        const draftId = getDraftContext(context, user);
+        if (draftId) {
+          await resetDraftEntityRead(context, user, initial.internal_id, draftId);
         }
       }
     } else if (impactedInputs.length > 0) {

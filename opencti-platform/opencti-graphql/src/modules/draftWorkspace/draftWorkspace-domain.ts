@@ -393,7 +393,12 @@ export const buildDraftVersion = (object: BasicStoreCommon) => {
     return null;
   }
 
-  return { draft_id: object.draft_ids[0], draft_operation: object.draft_change?.draft_operation };
+  return {
+    draft_id: object.draft_ids[0],
+    draft_operation: object.draft_change?.draft_operation,
+    draft_updates_patch: object.draft_change?.draft_updates_patch ?? null,
+    entity_id: object.id,
+  };
 };
 
 export const buildDraftValidationBundle = async (context: AuthContext, user: AuthUser, draft_id: string) => {

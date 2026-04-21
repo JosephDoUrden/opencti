@@ -6,12 +6,19 @@ import { isInferredIndex } from '../database/utils';
 import { STIX_SIGHTING_RELATIONSHIP } from '../schema/stixSightingRelationship';
 import { STIX_REF_RELATIONSHIP_TYPES } from '../schema/stixRefRelationship';
 import { buildDraftVersion } from '../modules/draftWorkspace/draftWorkspace-domain';
+import { findDraftEntityRead } from '../modules/draftEntityRead/draftEntityRead-domain';
 
 const stixObjectOrStixRelationshipResolvers = {
   Query: {
     stixObjectOrStixRelationship: (_, { id }, context) => findById(context, context.user, id),
     stixObjectOrStixRelationships: (_, args, context) => findStixObjectOrRelationshipsPaginated(context, context.user, args),
     stixCoreObjectOrStixCoreRelationship: (_, { id }, context) => findById(context, context.user, id),
+  },
+  DraftVersion: {
+    draft_is_read: (draftVersion, _, context) => {
+      return findDraftEntityRead(context, context.user, draftVersion.entity_id, draftVersion.draft_id)
+        .then((record) => record?.is_read ?? false);
+    },
   },
   StixObject: {
     is_inferred: (object) => isInferredIndex(object._index),
