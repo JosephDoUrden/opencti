@@ -68,6 +68,7 @@ export const TELEMETRY_FORM_INTAKE_UPDATED = 'formIntakeUpdatedCount';
 export const TELEMETRY_FORM_INTAKE_DELETED = 'formIntakeDeletedCount';
 export const TELEMETRY_FORM_INTAKE_SUBMITTED = 'formIntakeSubmittedCount';
 export const TELEMETRY_USER_LOGIN = 'userLoginCount';
+export const TELEMETRY_RETENTION_HISTORY = 'retentionHistoryCreationCount';
 
 export const addDisseminationCount = async () => {
   await redisSetTelemetryAdd(TELEMETRY_GAUGE_DISSEMINATION, 1);
@@ -142,6 +143,10 @@ export const addConnectorDeployedCount = async () => {
 
 export const addUserLoginCount = () => {
   redisSetTelemetryAdd(TELEMETRY_USER_LOGIN, 1).catch((reason) => logApp.info('Error add user login in telemetry', { reason }));
+};
+
+export const addRetentionHistoryCreationCount = async () => {
+  await redisSetTelemetryAdd(TELEMETRY_RETENTION_HISTORY, 1);
 };
 
 // End Region user event counters
@@ -330,6 +335,8 @@ export const fetchTelemetryData = async (manager: TelemetryMeterManager) => {
     manager.setFormIntakeDeletedCount(formIntakeDeletedCountInRedis);
     const formIntakeSubmittedCountInRedis = await redisGetTelemetry(TELEMETRY_FORM_INTAKE_SUBMITTED);
     manager.setFormIntakeSubmittedCount(formIntakeSubmittedCountInRedis);
+    const retentionHistoryCreationCountInRedis = await redisGetTelemetry(TELEMETRY_RETENTION_HISTORY);
+    manager.setRetentionHistoryCreationCount(retentionHistoryCreationCountInRedis);
     // end region Telemetry user events
 
     logApp.debug('[TELEMETRY] Fetching telemetry data successfully');
