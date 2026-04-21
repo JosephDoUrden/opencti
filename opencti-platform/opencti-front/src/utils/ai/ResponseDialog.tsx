@@ -171,7 +171,6 @@ const ResponseDialog: FunctionComponent<ResponseDialogProps> = ({
     if (!selectedAgent || !agentMode) return;
     setContent('');
     setAgentExecuted(false);
-    setAgentError(null);
   };
 
   const handleAgentChange = (_event: unknown, newValue: AgentOption | null) => {
