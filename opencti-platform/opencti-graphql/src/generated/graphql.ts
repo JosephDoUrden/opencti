@@ -7778,7 +7778,7 @@ export enum DraftStatus {
 export type DraftVersion = {
   __typename?: 'DraftVersion';
   draft_id: Scalars['String']['output'];
-  draft_is_read: Scalars['Boolean']['output'];
+  draft_is_read?: Maybe<Scalars['Boolean']['output']>;
   draft_operation: DraftOperation;
   draft_updates_patch?: Maybe<Scalars['String']['output']>;
 };
@@ -43405,7 +43405,7 @@ export type DraftObjectsCountResolvers<ContextType = any, ParentType extends Res
 
 export type DraftVersionResolvers<ContextType = any, ParentType extends ResolversParentTypes['DraftVersion'] = ResolversParentTypes['DraftVersion']> = ResolversObject<{
   draft_id?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  draft_is_read?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  draft_is_read?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
   draft_operation?: Resolver<ResolversTypes['DraftOperation'], ParentType, ContextType>;
   draft_updates_patch?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
 }>;
