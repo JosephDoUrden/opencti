@@ -46,6 +46,7 @@ const dashboardFragment = graphql`
     name
     description
     manifest
+    refresh_rate
     tags
     owner {
       id
@@ -108,6 +109,18 @@ const DashboardComponent = ({ data, noToolbar = false }) => {
       }, {}),
     );
   }, [widgetsArray]);
+
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  useEffect(() => {
+    if (!workspace.refresh_rate) return;
+    const interval = workspace.refresh_rate * 1000;
+    const timer = setInterval(() => {
+      setRefreshTrigger((prev) => prev + 1);
+    }, interval);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [workspace.refresh_rate]);
 
   /**
    * Merge a manifest with some layouts and transform it in base64.
@@ -330,6 +343,7 @@ const DashboardComponent = ({ data, noToolbar = false }) => {
                         widget={widget}
                         config={manifest.config}
                         popover={popover}
+                        refreshTrigger={refreshTrigger}
                       />
                     )}
                     {widget.perspective === 'relationships' && (

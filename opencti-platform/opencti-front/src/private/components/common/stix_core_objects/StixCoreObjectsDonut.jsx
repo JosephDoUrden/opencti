@@ -96,6 +96,7 @@ const StixCoreObjectsDonut = ({
   parameters = {},
   withoutTitle = false,
   popover,
+  refreshTrigger,
 }) => {
   const { t_i18n } = useFormatter();
   const [chart, setChart] = useState();
@@ -120,6 +121,7 @@ const StixCoreObjectsDonut = ({
     };
     return (
       <QueryRenderer
+        key={refreshTrigger}
         query={stixCoreObjectsDonutDistributionQuery}
         variables={variables}
         render={({ props }) => {

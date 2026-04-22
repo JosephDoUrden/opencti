@@ -28,12 +28,14 @@ interface DashboardEntitiesVizProps {
     startDate: string;
     endDate: string;
   };
+  refreshTrigger: number;
 }
 
 const DashboardEntitiesViz = ({
   widget,
   popover,
   config,
+  refreshTrigger,
 }: DashboardEntitiesVizProps) => {
   const startDate = config.relativeDate
     ? computerRelativeDate(config.relativeDate)
@@ -162,6 +164,7 @@ const DashboardEntitiesViz = ({
           parameters={widget.parameters as object} // because calling js component in ts
           height={undefined}
           popover={popover}
+          refreshTrigger={refreshTrigger}
         />
       );
     case 'polar-area':
