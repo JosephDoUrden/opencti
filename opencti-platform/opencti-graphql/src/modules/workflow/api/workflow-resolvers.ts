@@ -65,6 +65,18 @@ const workflowResolvers = {
     toStatus: (transition: any) => ({ id: transition.toState, template_id: transition.toState }),
     actions: (transition: any) => transition.actions ?? [],
   },
+  WorkflowSerializedState: {
+    onEnter: (state: any) => (Array.isArray(state.onEnter) ? state.onEnter : []),
+    onExit: (state: any) => (Array.isArray(state.onExit) ? state.onExit : []),
+  },
+  WorkflowSerializedTransition: {
+    actions: (t: any) => (Array.isArray(t.actions) ? t.actions : []),
+    conditions: (t: any) => (Array.isArray(t.conditions) ? t.conditions : []),
+  },
+  WorkflowSchema: {
+    states: (schema: any) => (Array.isArray(schema.states) ? schema.states : []),
+    transitions: (schema: any) => (Array.isArray(schema.transitions) ? schema.transitions : []),
+  },
   WorkflowTriggerResult: {
     status: (result: any) => (result.newState ? { id: result.newState, template_id: result.newState } : null),
     executionStatus: (result: any) => result.executionStatus,

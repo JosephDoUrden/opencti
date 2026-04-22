@@ -19,7 +19,7 @@ export class WorkflowFactory {
    * Translates a list of condition configurations into executable validator functions.
    */
   public static createConditions<TContext extends Context>(configs?: ConditionConfig[]): ConditionValidator<TContext>[] {
-    if (!configs || configs.length === 0) return [];
+    if (!Array.isArray(configs) || configs.length === 0) return [];
 
     return configs.map((config) => {
       // 1. Check if it's a named condition from registry
@@ -63,7 +63,7 @@ export class WorkflowFactory {
    * Translates a list of action configurations into executable side effect functions.
    */
   public static createSideEffects<TContext extends Context>(configs?: ActionConfig[]): SideEffect<TContext>[] {
-    if (!configs || configs.length === 0) return [];
+    if (!Array.isArray(configs) || configs.length === 0) return [];
 
     return configs.map((config) => {
       const actionFn = ActionRegistry[config.type];
@@ -94,14 +94,17 @@ export class WorkflowFactory {
   static createDefinition<TContext extends Context>(schema: WorkflowSchema): WorkflowDefinition<TContext> {
     const definition = new WorkflowDefinition<TContext>(schema.initialState);
 
-    schema.states.forEach((state) => {
+    const states = Array.isArray(schema.states) ? schema.states : [];
+    const transitions = Array.isArray(schema.transitions) ? schema.transitions : [];
+
+    states.forEach((state) => {
       definition.addState(state.statusId, {
         onEnter: this.createSideEffects<TContext>(state.onEnter),
         onExit: this.createSideEffects<TContext>(state.onExit),
       });
     });
 
-    schema.transitions.forEach((t) => {
+    transitions.forEach((t) => {
       definition.addTransition(t.from, t.to, t.event, {
         conditions: this.createConditions<TContext>(t.conditions),
         onTransition: this.createSideEffects<TContext>(t.actions),

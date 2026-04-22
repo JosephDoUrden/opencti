@@ -275,9 +275,11 @@ const updateWorkTaskToComplete = async (context, user, work) => {
 export const reportExpectation = async (context, user, workId, errorData) => {
   const timestamp = now();
   const { isComplete, total } = await redisUpdateWorkFigures(workId);
+  logApp.info('[WORKFLOW-TRACE] reportExpectation called', { workId, isComplete, total, hasError: !!errorData });
   // Ensure that work hasn't been deleted in the meantime
   const workAlive = await isWorkAlive(context, user, workId);
   if (!workAlive) {
+    logApp.info('[WORKFLOW-TRACE] reportExpectation: work no longer alive, skipping', { workId });
     await redisDeleteWorks(workId);
     return workId;
   }
@@ -307,6 +309,7 @@ export const reportExpectation = async (context, user, workId, errorData) => {
         const finalizedWork = await loadWorkById(context, user, workId);
         const hasErrors = (finalizedWork?.errors?.length ?? 0) > 0;
         const failureReason = hasErrors ? (finalizedWork?.errors?.[0]?.message || 'Background work failed') : undefined;
+        logApp.info('[WORKFLOW-TRACE] reportExpectation: calling resolvePendingWorkflowTransitionByWorkId', { workId, hasErrors, failureReason });
         await resolvePendingWorkflowTransitionByWorkId(context, user, workId, !hasErrors, failureReason);
       }
     } else {
@@ -407,12 +410,14 @@ export const updateProcessedTime = async (context, user, workId, message, inErro
   // Update elastic
   await elUpdate(currentWork._index, workId, { script: { source, lang: 'painless', params } });
   // Ensure task and workflow transition states are aligned when work reaches completion through processed events.
+  logApp.info('[WORKFLOW-TRACE] updateProcessedTime check', { workId, import_expected_number: currentWork.import_expected_number, isComplete });
   if (currentWork.import_expected_number === 0 || isComplete) {
     const finalizedWork = await loadWorkById(context, user, workId);
     if (finalizedWork) {
       await updateWorkTaskToComplete(context, user, finalizedWork);
       const hasErrors = (finalizedWork.errors?.length ?? 0) > 0;
       const failureReason = hasErrors ? (finalizedWork.errors?.[0]?.message || message || 'Background work failed') : undefined;
+      logApp.info('[WORKFLOW-TRACE] updateProcessedTime: calling resolvePendingWorkflowTransitionByWorkId', { workId, hasErrors, failureReason });
       await resolvePendingWorkflowTransitionByWorkId(context, user, workId, !hasErrors, failureReason);
     }
   }
