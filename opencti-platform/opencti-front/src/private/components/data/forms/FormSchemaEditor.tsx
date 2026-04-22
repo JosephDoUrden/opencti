@@ -1777,7 +1777,7 @@ const FormSchemaEditor: FunctionComponent<FormSchemaEditorProps> = ({
                 onSubmit={() => {}}
                 enableReinitialize
               >
-                {() => (
+                {({ setFieldValue }) => (
                   <>
                     {/* Draft Assignees Section */}
                     <Typography variant="h6" gutterBottom>{t_i18n('Draft Assignees')}</Typography>
@@ -1868,7 +1868,7 @@ const FormSchemaEditor: FunctionComponent<FormSchemaEditorProps> = ({
                           name="authorDefaultIdentity"
                           label={t_i18n('Default author identity')}
                           style={{ width: '100%', marginBottom: 20 }}
-                          setFieldValue={() => {}}
+                          setFieldValue={setFieldValue}
                         />
                       </Box>
                     )}
