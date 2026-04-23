@@ -11,7 +11,7 @@ import { redisInit } from './database/redis';
 import { ENTITY_TYPE_MIGRATION_STATUS } from './schema/internalObject';
 import { applyMigration, lastAvailableMigrationTime } from './database/migration';
 import { createEntity, loadEntity } from './database/middleware';
-import { ConfigurationError, LockTimeoutError, TYPE_LOCK_ERROR, UnsupportedError } from './config/errors';
+import { ConfigurationError, LockTimeoutError, TYPE_LOCK_ERROR } from './config/errors';
 import { executionContext, SYSTEM_USER } from './utils/access';
 import { smtpIsAlive } from './database/smtp';
 import { initCreateEntitySettings } from './modules/entitySetting/entitySetting-domain';

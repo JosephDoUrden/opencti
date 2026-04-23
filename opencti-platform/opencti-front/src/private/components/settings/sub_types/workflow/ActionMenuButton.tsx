@@ -56,7 +56,7 @@ const ActionMenuButton = ({ onAddObject, type }: ActionMenuButtonProps) => {
             <MenuItem onClick={() => onClickItem('unshareFromOrganization')}>{t_i18n('Unshare from an organization')}</MenuItem>
           </>
         )}
-        {import.meta.env.DEV && (
+        {process.env.NODE_ENV === 'development' && (
           <>
             <MenuItem onClick={() => onClickItem('fail')} sx={{ color: 'warning.main' }}>{t_i18n('[DEV] Fail action')}</MenuItem>
             <MenuItem onClick={() => onClickItem('failAsync')} sx={{ color: 'warning.main' }}>{t_i18n('[DEV] Async fail action')}</MenuItem>

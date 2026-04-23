@@ -2,19 +2,7 @@ import React, { FunctionComponent, useState } from 'react';
 import { Formik, Form } from 'formik';
 import { graphql, useFragment, useMutation } from 'react-relay';
 import ObjectOrganizationField from '../form/ObjectOrganizationField';
-import {
-  Alert,
-  AlertTitle,
-  CircularProgress,
-  DialogActions,
-  DialogContentText,
-  LinearProgress,
-  Menu,
-  MenuItem,
-  Stack,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+import { Alert, AlertTitle, CircularProgress, DialogActions, DialogContentText, LinearProgress, Menu, MenuItem, Stack, Tooltip, Typography } from '@mui/material';
 import { ArrowDropDownOutlined, CheckCircleOutlined, ErrorOutlined } from '@mui/icons-material';
 import ItemStatus from '../../../../components/ItemStatus';
 import Button from '../../../../components/common/button/Button';
@@ -264,10 +252,10 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
   }
 
   const { workflowInstance } = draft;
-  const pendingStatus = (workflowInstance as any).pendingStatus;
-  const pendingError = (workflowInstance as any).pendingError;
-  const pendingTransition = (workflowInstance as any).pendingTransition;
-  const isPending = pendingStatus === 'pending' || pendingStatus === 'PENDING';
+  const pendingStatus = workflowInstance.pendingStatus;
+  const pendingError = workflowInstance.pendingError;
+  const pendingTransition = workflowInstance.pendingTransition;
+  const isPending = pendingStatus === 'pending';
   const hasTransitions = workflowInstance.allowedTransitions.length > 0;
 
   if (!isPending && !pendingError && !hasTransitions) {
@@ -291,7 +279,7 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
       setValidationTransition(eventName);
     } else if (requiresOrgInput) {
       handleClose();
-      const operation = actions.includes('unshareFromOrganization') ? 'unshare' : 'share';
+      const operation = actions.some((a) => a.toLowerCase().includes('unshare')) ? 'unshare' : 'share';
       setSharingTransition({ event: eventName, operation });
     } else {
       commit({
@@ -301,7 +289,7 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
         },
         onCompleted: (response) => {
           handleClose();
-          const result = (response as any).triggerWorkflowEvent;
+          const result = response.triggerWorkflowEvent;
           if (result && !result.success && result.executionStatus !== 'pending' && !result.instance) {
             // Only fall back to toast if the instance wasn't updated (no bottom bar to show)
             MESSAGING$.notifyError(result.reason || t_i18n('Workflow transition failed'));
@@ -314,7 +302,6 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
   const handleSharingTransition = (orgValues: Array<{ value: string }>) => {
     if (!sharingTransition) return;
     const orgIds = orgValues.map((o) => o.value);
-    const operation = sharingTransition.operation === 'unshare' ? 'UNSHARE' : 'SHARE';
     setSharingTransition(null);
     commit({
       variables: {
@@ -325,7 +312,7 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
         },
       },
       onCompleted: (response) => {
-        const result = (response as any).triggerWorkflowEvent;
+        const result = response.triggerWorkflowEvent;
         if (result && !result.success && result.executionStatus !== 'pending' && !result.instance) {
           MESSAGING$.notifyError(result.reason || t_i18n('Workflow transition failed'));
         }
@@ -341,7 +328,7 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
           eventName: validationTransition,
         },
         onCompleted: (response) => {
-          const executionStatus = (response.triggerWorkflowEvent as any)?.executionStatus;
+          const executionStatus = response.triggerWorkflowEvent?.executionStatus;
           if (response.triggerWorkflowEvent?.success && executionStatus !== 'pending') {
             setValidationTransition(null);
             MESSAGING$.notifySuccess(t_i18n('Draft validation in progress'));
@@ -371,18 +358,21 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
       variables: {
         entityId: draft.id,
       },
-      onCompleted: (response: any) => {
-        const executionStatus = response.retryPendingWorkflowTransitionActions?.executionStatus;
-        if (response.retryPendingWorkflowTransitionActions?.success && executionStatus === 'pending') {
+      onCompleted: (response) => {
+        const retryResponse = response as { retryPendingWorkflowTransitionActions?: { success?: boolean; executionStatus?: string } };
+        const executionStatus = retryResponse.retryPendingWorkflowTransitionActions?.executionStatus;
+        if (retryResponse.retryPendingWorkflowTransitionActions?.success && executionStatus === 'pending') {
           MESSAGING$.notifySuccess(t_i18n('Workflow retry started and is pending completion'));
         }
       },
     });
   };
 
-  const asyncActions: any[] = pendingTransition?.asyncActions ?? [];
+  const asyncActions = pendingTransition?.asyncActions ?? [];
 
-  const getActionLabel = (action: any): string => {
+  type AsyncAction = (typeof asyncActions)[number];
+
+  const getActionLabel = (action: AsyncAction): string => {
     const count = action.summary?.affectedCount ?? 0;
     const targetType = action.summary?.targetType;
     const targetCount = action.summary?.targetIds?.length ?? 0;
@@ -410,7 +400,7 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
         <Stack spacing={0.75} sx={{ mt: 0.5, mb: 0.5 }}>
           <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
             <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0 }}>
-              {asyncActions.length > 0 ? asyncActions.map((action: any) => (
+              {asyncActions.length > 0 ? asyncActions.map((action) => (
                 <Stack key={action.id} direction="row" spacing={1} alignItems="center">
                   {action.status === 'success' && (
                     <CheckCircleOutlined sx={{ fontSize: 14, color: 'success.main' }} />

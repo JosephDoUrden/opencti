@@ -1,6 +1,6 @@
 import gql from 'graphql-tag';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { adminQuery } from '../../utils/testQuery';
+import { queryInitPlatformAsAdmin } from '../../utils/testQuery';
 
 const WORKFLOW_DEFINITION_ADD_MUTATION = gql`
   mutation WorkflowDefinitionSet($entityType: String!, $definition: String!) {
@@ -68,56 +68,41 @@ describe('Workflow Conditions Resolver', () => {
 
   beforeAll(async () => {
     // 1. Create a workspace
-    const result = await adminQuery({
-      query: CREATE_DRAFT_WORKSPACE_QUERY,
-      variables: {
+    const result = await queryInitPlatformAsAdmin(CREATE_DRAFT_WORKSPACE_QUERY, {
         input: { name: workspaceName },
-      },
-    });
+      });
     draftWorkspaceId = result.data.draftWorkspaceAdd.id;
 
     // 2. Set the workflow definition
-    await adminQuery({
-      query: WORKFLOW_DEFINITION_ADD_MUTATION,
-      variables: {
+    await queryInitPlatformAsAdmin(WORKFLOW_DEFINITION_ADD_MUTATION, {
         entityType: 'DraftWorkspace',
         definition: workflowDefinition,
-      },
-    });
+      });
   });
 
   it('should pass named condition (isAdmin)', async () => {
-    const result = await adminQuery({
-      query: TRIGGER_WORKFLOW_EVENT_MUTATION,
-      variables: {
+    const result = await queryInitPlatformAsAdmin(TRIGGER_WORKFLOW_EVENT_MUTATION, {
         entityId: draftWorkspaceId,
         eventName: 'named_condition_event',
-      },
-    });
+      });
     expect(result.data.triggerWorkflowEvent.success).toBe(true);
     expect(result.data.triggerWorkflowEvent.newState).toBe('step1');
   });
 
   it('should pass field comparison (entity.name eq workspaceName)', async () => {
-    const result = await adminQuery({
-      query: TRIGGER_WORKFLOW_EVENT_MUTATION,
-      variables: {
+    const result = await queryInitPlatformAsAdmin(TRIGGER_WORKFLOW_EVENT_MUTATION, {
         entityId: draftWorkspaceId,
         eventName: 'field_comparison_event',
-      },
-    });
+      });
     expect(result.data.triggerWorkflowEvent.success).toBe(true);
     expect(result.data.triggerWorkflowEvent.newState).toBe('step2');
   });
 
   it('should pass mixed conditions (named + field)', async () => {
-    const result = await adminQuery({
-      query: TRIGGER_WORKFLOW_EVENT_MUTATION,
-      variables: {
+    const result = await queryInitPlatformAsAdmin(TRIGGER_WORKFLOW_EVENT_MUTATION, {
         entityId: draftWorkspaceId,
         eventName: 'mixed_conditions_event',
-      },
-    });
+      });
     expect(result.data.triggerWorkflowEvent.success).toBe(true);
     expect(result.data.triggerWorkflowEvent.newState).toBe('done');
   });

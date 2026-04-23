@@ -50,8 +50,7 @@ const Workflow = ({ queryRef }: { queryRef: PreloadedQuery<SubTypeWorkflowQuery>
     workflowQuery,
     queryRef,
   );
-  const { workflowDefinition, statusTemplates, members } = queryData;
-  const organizations = (queryData as unknown as { organizations?: { edges?: Array<{ node?: { id: string; name: string } }> } }).organizations;
+  const { workflowDefinition, statusTemplates, members, organizations } = queryData;
 
   // 1. Get initial edges and nodes from workflow definition
   const { initialNodes, initialEdges } = useWorkflowInitialElements(workflowDefinition, statusTemplates, members, organizations);

@@ -1,6 +1,6 @@
 import gql from 'graphql-tag';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { adminQuery, ADMIN_USER, TEST_ORGANIZATION } from '../../utils/testQuery';
+import { queryInitPlatformAsAdmin, ADMIN_USER, TEST_ORGANIZATION } from '../../utils/testQuery';
 
 const WORKFLOW_DEFINITION_SET_MUTATION = gql`
   mutation WorkflowDefinitionSet($entityType: String!, $definition: String!) {
@@ -58,12 +58,9 @@ describe('Workflow Actions Resolver', () => {
   let draftWorkspaceId: string;
 
   beforeAll(async () => {
-    const result = await adminQuery({
-      query: CREATE_DRAFT_WORKSPACE_QUERY,
-      variables: {
+    const result = await queryInitPlatformAsAdmin(CREATE_DRAFT_WORKSPACE_QUERY, {
         input: { name: 'Workflow Action Test Workspace' },
-      },
-    });
+      });
     draftWorkspaceId = result.data.draftWorkspaceAdd.id;
   });
 
@@ -96,30 +93,21 @@ describe('Workflow Actions Resolver', () => {
     });
 
     // 2. Set the workflow definition
-    await adminQuery({
-      query: WORKFLOW_DEFINITION_SET_MUTATION,
-      variables: {
+    await queryInitPlatformAsAdmin(WORKFLOW_DEFINITION_SET_MUTATION, {
         entityType: 'DraftWorkspace',
         definition: workflowDefinition,
-      },
-    });
+      });
 
     // 3. Trigger the event
-    const triggerResult = await adminQuery({
-      query: TRIGGER_WORKFLOW_EVENT_MUTATION,
-      variables: {
+    const triggerResult = await queryInitPlatformAsAdmin(TRIGGER_WORKFLOW_EVENT_MUTATION, {
         entityId: draftWorkspaceId,
         eventName: 'restrict_event',
-      },
-    });
+      });
     expect(triggerResult.data.triggerWorkflowEvent.success).toBe(true);
     expect(triggerResult.data.triggerWorkflowEvent.newState).toBe('restricted');
 
     // 4. Verify authorized members
-    const workspaceResult = await adminQuery({
-      query: DRAFT_WORKSPACE_QUERY,
-      variables: { id: draftWorkspaceId },
-    });
+    const workspaceResult = await queryInitPlatformAsAdmin(DRAFT_WORKSPACE_QUERY, { id: draftWorkspaceId });
 
     const { authorizedMembers } = workspaceResult.data.draftWorkspace;
     expect(authorizedMembers.length).toBe(2);
@@ -130,11 +118,8 @@ describe('Workflow Actions Resolver', () => {
   });
 
   it('should cleanup after tests', async () => {
-    await adminQuery({
-      query: WORKFLOW_DEFINITION_DELETE_MUTATION,
-      variables: {
+    await queryInitPlatformAsAdmin(WORKFLOW_DEFINITION_DELETE_MUTATION, {
         entityType: 'DraftWorkspace',
-      },
-    });
+      });
   });
 });

@@ -323,9 +323,9 @@ export const getWorkflowInstance = async (
   // Compute asyncActions for GQL consumers by flattening dispatched phases
   const gqlPendingTransition = pendingTransition
     ? {
-      ...pendingTransition,
-      asyncActions: pendingTransition.phases.flatMap((p) => (p.asyncAction ? [p.asyncAction] : [])),
-    }
+        ...pendingTransition,
+        asyncActions: pendingTransition.phases.flatMap((p) => (p.asyncAction ? [p.asyncAction] : [])),
+      }
     : null;
 
   return {

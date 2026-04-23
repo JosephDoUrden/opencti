@@ -1,25 +1,14 @@
 import React, { FunctionComponent, useEffect, useMemo, useState } from 'react';
 import { graphql, PreloadedQuery } from 'react-relay';
 import { DraftTasksQuery, DraftTasksQuery$variables } from '@components/drafts/__generated__/DraftTasksQuery.graphql';
+import { DraftTasksLines_data$key, DraftTasksLines_data$data } from '@components/drafts/__generated__/DraftTasksLines_data.graphql';
+import { UseLocalStorageHelpers } from '../../../utils/hooks/useLocalStorage';
 import { useQueryLoadingWithLoadQuery } from '../../../utils/hooks/useQueryLoading';
 import { fetchQuery } from '../../../relay/environment';
 import { emptyFilterGroup } from '../../../utils/filters/filtersUtils';
 import { usePaginationLocalStorage } from '../../../utils/hooks/useLocalStorage';
 import usePreloadedPaginationFragment from '../../../utils/hooks/usePreloadedPaginationFragment';
-import {
-  Box,
-  Chip,
-  Divider,
-  IconButton,
-  LinearProgress,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Typography,
-} from '@mui/material';
+import { Box, Chip, Divider, IconButton, LinearProgress, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import { ExpandLessOutlined, ExpandMoreOutlined } from '@mui/icons-material';
 import { useFormatter } from '../../../components/i18n';
 
@@ -153,13 +142,13 @@ export const draftTasksQuery = graphql`
 const LOCAL_STORAGE_KEY = 'draft_tasks';
 const TASKS_POLL_INTERVAL = 2000;
 
-const formatTaskType = (type?: string) => (type ?? '')
+const formatTaskType = (type?: string | null) => (type ?? '')
   .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
   .replace(/[_-]+/g, ' ')
   .trim()
   .toLowerCase();
 
-const formatActionTypes = (actions?: ReadonlyArray<{ type?: string | null } | null>) => {
+const formatActionTypes = (actions?: ReadonlyArray<{ type?: string | null | undefined } | null | undefined> | null) => {
   const normalized = Array.from(new Set(
     (actions ?? [])
       .map((action) => action?.type ?? '')
@@ -199,7 +188,7 @@ interface DraftTasksProps {
 
 interface DraftTasksTableProps {
   queryRef: PreloadedQuery<DraftTasksQuery>;
-  setNumberOfElements: (value: string) => void;
+  setNumberOfElements: UseLocalStorageHelpers['handleSetNumberOfElements'];
 }
 
 const DraftTasksTable: FunctionComponent<DraftTasksTableProps> = ({ queryRef, setNumberOfElements }) => {
@@ -214,12 +203,14 @@ const DraftTasksTable: FunctionComponent<DraftTasksTableProps> = ({ queryRef, se
     setNumberOfElements,
   };
 
-  const { data } = usePreloadedPaginationFragment<DraftTasksQuery, any>(preloadedPaginationProps as any);
+  const { data } = usePreloadedPaginationFragment<DraftTasksQuery, DraftTasksLines_data$key>(preloadedPaginationProps);
+
+  type TaskNode = NonNullable<NonNullable<NonNullable<DraftTasksLines_data$data['backgroundTasks']>['edges']>[number]>['node'];
 
   const rows = useMemo(() => {
     return (data?.backgroundTasks?.edges ?? [])
-      .map((edge: any) => edge?.node)
-      .filter(Boolean);
+      .map((edge) => edge?.node)
+      .filter((node): node is TaskNode => node != null);
   }, [data]);
 
   const toggleRow = (taskId: string) => {
@@ -242,7 +233,7 @@ const DraftTasksTable: FunctionComponent<DraftTasksTableProps> = ({ queryRef, se
         </TableRow>
       </TableHead>
       <TableBody>
-        {rows.map((task: any) => {
+        {rows.map((task) => {
           const actionTypes = formatActionTypes(task.actions);
           const labelType = actionTypes || formatTaskType(task.type);
           const isExpanded = !!expandedTaskIds[task.id];
@@ -286,7 +277,7 @@ const DraftTasksTable: FunctionComponent<DraftTasksTableProps> = ({ queryRef, se
                               </Typography>
                               <Chip
                                 size="small"
-                                color={getWorkStatusColor(task.work.status) as any}
+                                color={getWorkStatusColor(task.work.status) as 'default' | 'success' | 'warning'}
                                 label={task.work.status ?? t_i18n('Unknown')}
                                 variant="outlined"
                               />
