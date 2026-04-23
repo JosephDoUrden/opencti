@@ -42,6 +42,7 @@ type DraftObjectsCount {
     relationshipsCount: Int!
     sightingsCount: Int!
     containersCount: Int!
+    reviewsCount: Int!
 }
 
 # Ordering
@@ -92,6 +93,7 @@ type Query {
         orderMode: OrderingMode
         filters: FilterGroup
         search: String
+        draftOperation: String
     ): StixCoreObjectConnection @auth(for: [KNOWLEDGE])
     draftWorkspaceContainerObjects(
         draftId: String!

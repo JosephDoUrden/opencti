@@ -8,7 +8,7 @@ import { type EntityOptions, fullEntitiesList, fullRelationsList, pageEntitiesCo
 import { pushToWorkerForConnector } from '../../database/rabbitmq';
 import { notify, setEditContext } from '../../database/redis';
 import { buildStixBundle } from '../../database/stix-2-1-converter';
-import { computeSumOfList, isDraftIndex, READ_INDEX_DRAFT_OBJECTS, READ_INDEX_HISTORY, READ_INDEX_INTERNAL_OBJECTS } from '../../database/utils';
+import { buildPagination, computeSumOfList, isDraftIndex, READ_INDEX_DRAFT_OBJECTS, READ_INDEX_HISTORY, READ_INDEX_INTERNAL_OBJECTS } from '../../database/utils';
 import { createWork, updateExpectationsNumber } from '../../domain/work';
 import {
   type DraftWorkspaceAddInput,
@@ -44,7 +44,7 @@ import { editAuthorizedMembers } from '../../utils/authorizedMembers';
 import { getDraftContext } from '../../utils/draftContext';
 import { addFilter } from '../../utils/filtering/filtering-utils';
 import { now } from '../../utils/format';
-import { DRAFT_OPERATION_CREATE, DRAFT_OPERATION_DELETE, DRAFT_OPERATION_UPDATE } from './draftOperations';
+import { DRAFT_OPERATION_CREATE, DRAFT_OPERATION_DELETE, DRAFT_OPERATION_UPDATE, DRAFT_OPERATION_UPDATE_LINKED } from './draftOperations';
 import { DRAFT_STATUS_OPEN, DRAFT_STATUS_VALIDATED } from './draftStatuses';
 import { DRAFT_VALIDATION_CONNECTOR } from './draftWorkspace-connector';
 import { type BasicStoreEntityDraftWorkspace, ENTITY_TYPE_DRAFT_WORKSPACE, type StoreEntityDraftWorkspace } from './draftWorkspace-types';
@@ -87,6 +87,12 @@ export const getObjectsCount = async (context: AuthContext, user: AuthUser, draf
   };
   const draftContext = { ...context, draft_context: draft.id };
   const distributionResult = await elAggregationCount(draftContext, user, READ_INDEX_DRAFT_OBJECTS, opts);
+
+  const allDraftEntities = await elList(draftContext, user, READ_INDEX_DRAFT_OBJECTS, { includeDeletedInDraft: true });
+  const reviewsCount = allDraftEntities.filter(
+    (e: BasicStoreCommon) => e.draft_change?.draft_operation === DRAFT_OPERATION_UPDATE,
+  ).length;
+
   // TODO fix total to include only stix domain objects & SCO & stix core relationships & sightings & stix domain objects
   const totalCount = computeSumOfList(distributionResult.map((r: { label: string; count: number }) => r.count));
   const entitiesCount = computeSumOfList(
@@ -111,6 +117,7 @@ export const getObjectsCount = async (context: AuthContext, user: AuthUser, draf
     relationshipsCount,
     sightingsCount,
     containersCount,
+    reviewsCount,
   };
 };
 
@@ -172,17 +179,24 @@ export const getCurrentUserAccessRight = async (
   return getUserAccessRight(user, draft);
 };
 
-export const listDraftObjects = (context: AuthContext, user: AuthUser, args: QueryDraftWorkspaceEntitiesArgs) => {
+export const listDraftObjects = async (context: AuthContext, user: AuthUser, args: QueryDraftWorkspaceEntitiesArgs) => {
   let types: string[] = [];
-  const { draftId, ...listArgs } = args;
+  const { draftId, draftOperation, ...listArgs } = args as QueryDraftWorkspaceEntitiesArgs & { draftOperation?: string };
   if (args.types) {
     types = args.types.filter((t) => t && isStixCoreObject(t)) as string[];
   }
   if (types.length === 0) {
     types.push(ABSTRACT_STIX_CORE_OBJECT);
   }
-  const newArgs: EntityOptions<BasicStoreEntity> = { ...listArgs, types, indices: [READ_INDEX_DRAFT_OBJECTS], includeDeletedInDraft: true };
   const draftContext = { ...context, draft_context: draftId };
+  if (draftOperation) {
+    const allEntities = await elList<BasicStoreEntity>(draftContext, user, READ_INDEX_DRAFT_OBJECTS, { types, includeDeletedInDraft: true });
+    const filtered = allEntities.filter((e) => e.draft_change?.draft_operation === draftOperation);
+    const first = listArgs.first ?? filtered.length;
+    const instances = filtered.slice(0, first).map((e) => ({ node: e }));
+    return buildPagination(first, listArgs.after ?? null, instances, filtered.length);
+  }
+  const newArgs: EntityOptions<BasicStoreEntity> = { ...listArgs, types, indices: [READ_INDEX_DRAFT_OBJECTS], includeDeletedInDraft: true };
   return pageEntitiesConnection<BasicStoreEntity>(draftContext, user, types, newArgs);
 };
 

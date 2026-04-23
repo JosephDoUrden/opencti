@@ -40,6 +40,7 @@ const draftReviewEntitiesLinesQuery = graphql`
     $cursor: ID
     $orderBy: StixCoreObjectsOrdering
     $orderMode: OrderingMode
+    $draftOperation: String
   ) {
     ...DraftReviewEntityList_data
     @arguments(
@@ -48,6 +49,7 @@ const draftReviewEntitiesLinesQuery = graphql`
       cursor: $cursor
       orderBy: $orderBy
       orderMode: $orderMode
+      draftOperation: $draftOperation
     )
   }
 `;
@@ -60,6 +62,7 @@ const draftReviewEntitiesLinesFragment = graphql`
     cursor: { type: "ID" }
     orderBy: { type: "StixCoreObjectsOrdering", defaultValue: entity_type }
     orderMode: { type: "OrderingMode", defaultValue: asc }
+    draftOperation: { type: "String" }
   )
   @refetchable(queryName: "DraftReviewEntityListRefetchQuery") {
     draftWorkspaceEntities(
@@ -68,6 +71,7 @@ const draftReviewEntitiesLinesFragment = graphql`
       after: $cursor
       orderBy: $orderBy
       orderMode: $orderMode
+      draftOperation: $draftOperation
     ) @connection(key: "DraftReviewEntityList__draftWorkspaceEntities") {
       edges {
         node {
@@ -128,6 +132,7 @@ const DraftReviewEntityList: FunctionComponent<DraftReviewEntityListProps> = ({
     orderAsc: true,
     openExports: false,
     draftId,
+    draftOperation: 'update',
   };
 
   const {
@@ -138,6 +143,7 @@ const DraftReviewEntityList: FunctionComponent<DraftReviewEntityListProps> = ({
   const queryPaginationOptions = {
     ...paginationOptions,
     draftId,
+    draftOperation: 'update',
   } as unknown as DraftReviewEntityListPaginationQuery$variables;
 
   const queryRef = useQueryLoading<DraftReviewEntityListPaginationQuery>(
@@ -201,8 +207,7 @@ const DraftReviewEntityList: FunctionComponent<DraftReviewEntityListProps> = ({
         <DataTable
           dataColumns={dataColumns}
           resolvePath={(data: DraftReviewEntityList_data$data) => data.draftWorkspaceEntities?.edges
-            ?.map((n) => n?.node)
-            .filter((n) => n?.draftVersion?.draft_operation === 'update' || n?.draftVersion?.draft_operation === 'update_linked')}
+            ?.map((n) => n?.node)}
           storageKey={LOCAL_STORAGE_KEY}
           initialValues={initialValues}
           preloadedPaginationProps={preloadedPaginationProps}

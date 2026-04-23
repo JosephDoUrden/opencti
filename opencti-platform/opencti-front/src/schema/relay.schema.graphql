@@ -9723,7 +9723,7 @@ type Query {
   draftWorkspace(id: String!): DraftWorkspace
   draftWorkspaces(first: Int, after: ID, orderBy: DraftWorkspacesOrdering, orderMode: OrderingMode, filters: FilterGroup, search: String): DraftWorkspaceConnection
   draftWorkspacesRestricted(first: Int, after: ID, orderBy: DraftWorkspacesOrdering, orderMode: OrderingMode, filters: FilterGroup, search: String): DraftWorkspaceConnection
-  draftWorkspaceEntities(draftId: String!, types: [String], first: Int, after: ID, orderBy: StixCoreObjectsOrdering, orderMode: OrderingMode, filters: FilterGroup, search: String): StixCoreObjectConnection
+  draftWorkspaceEntities(draftId: String!, types: [String], first: Int, after: ID, orderBy: StixCoreObjectsOrdering, orderMode: OrderingMode, filters: FilterGroup, search: String, draftOperation: String): StixCoreObjectConnection
   draftWorkspaceContainerObjects(draftId: String!, containerId: String!): [DraftContainerObjectChange!]!
   draftWorkspaceRelationships(draftId: String!, types: [String], first: Int, after: ID, orderBy: StixRelationshipsOrdering, orderMode: OrderingMode, filters: FilterGroup, search: String): StixRelationshipConnection
   draftWorkspaceSightingRelationships(draftId: String!, types: [String], first: Int, after: ID, orderBy: StixSightingRelationshipsOrdering, orderMode: OrderingMode, filters: FilterGroup, search: String): StixSightingRelationshipConnection
@@ -14984,6 +14984,7 @@ type DraftObjectsCount {
   relationshipsCount: Int!
   sightingsCount: Int!
   containersCount: Int!
+  reviewsCount: Int!
 }
 
 enum DraftWorkspacesOrdering {

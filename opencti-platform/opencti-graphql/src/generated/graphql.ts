@@ -7766,6 +7766,7 @@ export type DraftObjectsCount = {
   entitiesCount: Scalars['Int']['output'];
   observablesCount: Scalars['Int']['output'];
   relationshipsCount: Scalars['Int']['output'];
+  reviewsCount: Scalars['Int']['output'];
   sightingsCount: Scalars['Int']['output'];
   totalCount: Scalars['Int']['output'];
 };
@@ -25007,6 +25008,7 @@ export type QueryDraftWorkspaceContainerObjectsArgs = {
 export type QueryDraftWorkspaceEntitiesArgs = {
   after?: InputMaybe<Scalars['ID']['input']>;
   draftId: Scalars['String']['input'];
+  draftOperation?: InputMaybe<Scalars['String']['input']>;
   filters?: InputMaybe<FilterGroup>;
   first?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<StixCoreObjectsOrdering>;
@@ -43423,6 +43425,7 @@ export type DraftObjectsCountResolvers<ContextType = any, ParentType extends Res
   entitiesCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   observablesCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   relationshipsCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  reviewsCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   sightingsCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   totalCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
 }>;

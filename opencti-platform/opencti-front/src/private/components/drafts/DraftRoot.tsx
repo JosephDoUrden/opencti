@@ -66,6 +66,7 @@ export const draftRootFragment = graphql`
       observablesCount
       relationshipsCount
       sightingsCount
+      reviewsCount
       totalCount
     }
     draft_status
@@ -268,7 +269,7 @@ const RootDraftComponent = ({ draftId, queryRef, refetch }: RootDraftComponentPr
             component={Link}
             to="review"
             value="review"
-            label={<span>{t_i18n('Review')}</span>}
+            label={<span>{t_i18n('Review')} ({objectsCount.reviewsCount})</span>}
           />
         </Tabs>
       </Box>
