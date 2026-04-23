@@ -373,7 +373,7 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
           endIcon={<ArrowDropDownOutlined />}
           disabled={isPending}
         >
-          {t_i18n('Workflow')}
+          {t_i18n('Actions')}
         </Button>
       )}
       {(isPending || (!isPending && pendingError)) && (
