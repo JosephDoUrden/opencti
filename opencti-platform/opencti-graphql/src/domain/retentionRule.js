@@ -1,4 +1,4 @@
-import { deleteElementById, updateAttribute } from '../database/middleware';
+import { deleteElementById, updateAttributeLockFirst } from '../database/middleware';
 import { topEntitiesList, pageEntitiesConnection, storeLoadById } from '../database/middleware-loader';
 import { ENTITY_TYPE_RETENTION_RULE } from '../schema/internalObject';
 import { generateInternalId, generateStandardId } from '../schema/identifier';
@@ -82,7 +82,7 @@ export const createRetentionRule = async (_, user, input) => {
 };
 
 export const retentionRuleEditField = async (context, user, retentionRuleId, input) => {
-  const { element } = await updateAttribute(context, user, retentionRuleId, ENTITY_TYPE_RETENTION_RULE, input);
+  const { element } = await updateAttributeLockFirst(context, user, retentionRuleId, ENTITY_TYPE_RETENTION_RULE, input);
   await publishUserAction({
     user,
     event_type: 'mutation',
