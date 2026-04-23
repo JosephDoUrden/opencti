@@ -4,7 +4,7 @@ import { elDeleteDraftContextFromUsers, elDeleteDraftContextFromWorks, elDeleteD
 import { buildUpdateFieldPatch } from '../../database/draft-utils';
 import { elAggregationCount, elCount, elList, elLoadById, loadDraftElement } from '../../database/engine';
 import { createEntity, createRelation, deleteElementById, deleteRelationsByFromAndTo, stixLoadByIds, updateAttribute } from '../../database/middleware';
-import { type EntityOptions, fullEntitiesList, pageEntitiesConnection, pageRelationsConnection, storeLoadById } from '../../database/middleware-loader';
+import { type EntityOptions, fullEntitiesList, fullRelationsList, pageEntitiesConnection, pageRelationsConnection, storeLoadById } from '../../database/middleware-loader';
 import { pushToWorkerForConnector } from '../../database/rabbitmq';
 import { notify, setEditContext } from '../../database/redis';
 import { buildStixBundle } from '../../database/stix-2-1-converter';
@@ -29,7 +29,7 @@ import { authorizedMembers } from '../../schema/attribute-definition';
 import { ABSTRACT_INTERNAL_RELATIONSHIP, ABSTRACT_STIX_CORE_OBJECT, ABSTRACT_STIX_CORE_RELATIONSHIP } from '../../schema/general';
 import { ENTITY_TYPE_BACKGROUND_TASK, ENTITY_TYPE_INTERNAL_FILE, ENTITY_TYPE_USER, ENTITY_TYPE_WORK } from '../../schema/internalObject';
 import { isStixCoreObject } from '../../schema/stixCoreObject';
-import { isStixRefRelationship } from '../../schema/stixRefRelationship';
+import { isStixRefRelationship, RELATION_OBJECT } from '../../schema/stixRefRelationship';
 import { isStixSightingRelationship, STIX_SIGHTING_RELATIONSHIP } from '../../schema/stixSightingRelationship';
 import { isStixRelationshipExceptRef } from '../../schema/stixRelationship';
 import { isStixDomainObject, isStixDomainObjectContainer } from '../../schema/stixDomainObject';
@@ -468,6 +468,33 @@ export const validateDraftWorkspace = async (context: AuthContext, user: AuthUse
   await addDraftValidationCount();
 
   return work;
+};
+
+export const listDraftContainerObjects = async (context: AuthContext, user: AuthUser, args: { draftId: string; containerId: string }) => {
+  const { draftId, containerId } = args;
+  const draftContext = { ...context, draft_context: draftId };
+
+  const relations = await fullRelationsList(draftContext, user, RELATION_OBJECT, {
+    fromId: containerId,
+    indices: [READ_INDEX_DRAFT_OBJECTS],
+  });
+
+  const result = [];
+  for (const rel of relations) {
+    const op = rel.draft_change?.draft_operation;
+    if (op !== DRAFT_OPERATION_CREATE && op !== DRAFT_OPERATION_DELETE) continue;
+
+    const entity = await storeLoadById(draftContext, user, rel.toId, ABSTRACT_STIX_CORE_OBJECT);
+    if (!entity) continue;
+
+    result.push({
+      entity_id: rel.toId,
+      entity_type: entity.entity_type,
+      representative_main: extractEntityRepresentativeName(entity),
+      draft_operation: op === DRAFT_OPERATION_CREATE ? 'add' : 'remove',
+    });
+  }
+  return result;
 };
 
 export const draftWorkspaceEditContext = async (context: AuthContext, user: AuthUser, draftId: string, input?: EditContext) => {

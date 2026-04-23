@@ -16,6 +16,7 @@ import {
   listDraftObjects,
   listDraftRelations,
   listDraftSightingRelations,
+  listDraftContainerObjects,
   validateDraftWorkspace,
 } from './draftWorkspace-domain';
 import { findById as findWorkById, worksForDraft } from '../../domain/work';
@@ -38,6 +39,7 @@ const draftWorkspaceResolvers: Resolvers = {
       context.changeDraftContext(args.draftId);
       return listDraftSightingRelations(context, context.user, args);
     },
+    draftWorkspaceContainerObjects: (_, args, context) => listDraftContainerObjects(context, context.user, args),
   },
   DraftWorkspace: {
     creators: async (draft, _, context) => loadCreators(context, context.user, draft),

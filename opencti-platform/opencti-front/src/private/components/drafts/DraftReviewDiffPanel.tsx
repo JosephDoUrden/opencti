@@ -2,15 +2,19 @@ import React, { FunctionComponent, Suspense } from 'react';
 import { graphql, useLazyLoadQuery } from 'react-relay';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 import Loader from '../../../components/Loader';
 import { useFormatter } from '../../../components/i18n';
 import LaunchIcon from '@mui/icons-material/Launch';
 import IconButton from '@mui/material/IconButton';
 import { Change } from '../../../components/common/table/ChangesTable';
 import { DraftReviewDiffPanelQuery } from './__generated__/DraftReviewDiffPanelQuery.graphql';
+import { DraftReviewDiffPanelContainerObjectsQuery } from './__generated__/DraftReviewDiffPanelContainerObjectsQuery.graphql';
+import { DraftReviewDiffPanelSubTypeQuery } from './__generated__/DraftReviewDiffPanelSubTypeQuery.graphql';
 import { resolveLink } from '../../../utils/Entity';
 import { Link } from 'react-router-dom';
 import TruncatedRawValue from '../common/drawer/TruncatedRawValue';
+import { containerTypes } from '../../../utils/hooks/useAttributes';
 
 const draftReviewDiffPanelQuery = graphql`
   query DraftReviewDiffPanelQuery($draftId: String!) {
@@ -31,6 +35,30 @@ const draftReviewDiffPanelQuery = graphql`
           }
         }
       }
+    }
+  }
+`;
+
+const draftReviewDiffPanelSubTypeQuery = graphql`
+  query DraftReviewDiffPanelSubTypeQuery($entityType: String!) {
+    subType(id: $entityType) {
+      settings {
+        attributesDefinitions {
+          name
+          label
+        }
+      }
+    }
+  }
+`;
+
+const draftReviewDiffPanelContainerObjectsQuery = graphql`
+  query DraftReviewDiffPanelContainerObjectsQuery($draftId: String!, $containerId: String!) {
+    draftWorkspaceContainerObjects(draftId: $draftId, containerId: $containerId) {
+      entity_id
+      entity_type
+      representative_main
+      draft_operation
     }
   }
 `;
@@ -67,40 +95,93 @@ const parseUpdatesPatch = (rawPatch: string | null | undefined): Change[] => {
   }
 };
 
-const DRAFT_FIELD_MAPPING = {
-  published: 'Publication date',
-  x_opencti_reliability: 'Reliability',
-  x_opencti_score: 'Score',
-  x_opencti_workflow_id: 'Status',
-  x_opencti_color: 'Color',
-  x_opencti_description: 'Description',
-  description: 'Description',
-  url: 'URL',
-  valid_from: 'Valid from',
-  valid_until: 'Valid until',
-  first_seen: 'First seen',
-  last_seen: 'Last seen',
-  objectLabel: 'Labels',
-  objectMarking: 'Markings',
-  createdBy: 'Author',
-  objectAssignee: 'Assignees',
-  objectParticipant: 'Participants',
-  x_mitre_platforms: 'Platforms',
-  x_mitre_permissions_required: 'Required permissions',
-  malware_types: 'Malware types',
-  threat_actor_types: 'Threat actor types',
-  identity_class: 'Identity class',
-  contact_information: 'Contact information',
-  x_opencti_organization_type: 'Organization type',
+const buildFieldLabelMap = (
+  attributesDefinitions: ReadonlyArray<{ name: string; label: string | null | undefined }> | null | undefined,
+): Record<string, string> => {
+  if (!attributesDefinitions) return {};
+  return Object.fromEntries(
+    attributesDefinitions
+      .filter((a) => a.label)
+      .map((a) => [a.name, a.label as string]),
+  );
 };
 
-const formatFieldKey = (field?: string) => {
+const formatFieldKey = (field: string | undefined, labelMap: Record<string, string>): string => {
   if (!field) return '';
-  const mapped = DRAFT_FIELD_MAPPING[field as keyof typeof DRAFT_FIELD_MAPPING];
-  if (mapped) return mapped;
-  // Capitalize first letter and replace underscores with spaces
+  if (labelMap[field]) return labelMap[field];
   const formatted = field.replace(/_/g, ' ');
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+};
+
+interface ContainerObjectsTabProps {
+  draftId: string;
+  containerId: string;
+}
+
+const ContainerObjectsTab: FunctionComponent<ContainerObjectsTabProps> = ({ draftId, containerId }) => {
+  const { t_i18n } = useFormatter();
+
+  const data = useLazyLoadQuery<DraftReviewDiffPanelContainerObjectsQuery>(
+    draftReviewDiffPanelContainerObjectsQuery,
+    { draftId, containerId },
+    { fetchPolicy: 'store-and-network' },
+  );
+
+  const objects = data.draftWorkspaceContainerObjects ?? [];
+
+  if (objects.length === 0) {
+    return (
+      <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2 }}>
+        {t_i18n('No objects added or removed from this container')}
+      </Typography>
+    );
+  }
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', backgroundColor: 'background.paper', borderRadius: '4px', p: '16px' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', mb: 2 }}>
+        <Typography sx={{ width: 120, fontSize: 12, fontWeight: 600, color: 'text.secondary', fontFamily: 'IBM Plex Sans, sans-serif' }}>
+          {t_i18n('Action')}
+        </Typography>
+        <Typography sx={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'text.secondary', fontFamily: 'IBM Plex Sans, sans-serif' }}>
+          {t_i18n('Type')}
+        </Typography>
+        <Typography sx={{ flex: 2, fontSize: 12, fontWeight: 600, color: 'text.secondary', fontFamily: 'IBM Plex Sans, sans-serif' }}>
+          {t_i18n('Representative')}
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {objects.map((obj) => {
+          const isAdd = obj.draft_operation === 'add';
+          return (
+            <Box
+              key={obj.entity_id}
+              sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}
+            >
+              <Box sx={{ width: 120 }}>
+                <Chip
+                  label={isAdd ? t_i18n('Added') : t_i18n('Removed')}
+                  color={isAdd ? 'success' : 'error'}
+                  size="small"
+                  sx={{ borderRadius: '4px', height: 24, fontSize: 12, fontWeight: 600 }}
+                />
+              </Box>
+              <Box sx={{ flex: 1, pr: 2 }}>
+                <Typography sx={{ fontSize: 14, fontFamily: 'IBM Plex Sans, sans-serif', color: 'text.primary', wordBreak: 'break-word' }}>
+                  {t_i18n(`entity_${obj.entity_type}`)}
+                </Typography>
+              </Box>
+              <Box sx={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography sx={{ fontSize: 14, fontFamily: 'IBM Plex Sans, sans-serif', color: 'text.primary', wordBreak: 'break-word' }}>
+                  {obj.representative_main ?? obj.entity_id}
+                </Typography>
+              </Box>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
 };
 
 interface DraftReviewDiffPanelContentProps {
@@ -123,6 +204,14 @@ const DraftReviewDiffPanelContent: FunctionComponent<DraftReviewDiffPanelContent
   const entityNode = (data.draftWorkspaceEntities?.edges ?? [])
     .map((e) => e?.node)
     .find((node) => node?.id === entityId);
+
+  const subTypeData = useLazyLoadQuery<DraftReviewDiffPanelSubTypeQuery>(
+    draftReviewDiffPanelSubTypeQuery,
+    { entityType: entityNode?.entity_type ?? 'Report' },
+    { fetchPolicy: 'store-and-network' },
+  );
+
+  const labelMap = buildFieldLabelMap(subTypeData.subType?.settings?.attributesDefinitions);
 
   if (!entityNode) {
     return (
@@ -200,53 +289,63 @@ const DraftReviewDiffPanelContent: FunctionComponent<DraftReviewDiffPanelContent
   }
 
   const changes = parseUpdatesPatch(entityNode.draftVersion?.draft_updates_patch);
+  const isContainer = containerTypes.includes(entityNode.entity_type);
+
+  const renderFieldsTab = () => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '7px', width: '100%', mb: '8px' }}>
+        <Box sx={{ flex: 1, backgroundColor: 'background.default', borderLeft: '1px solid', borderLeftColor: 'error.main', borderRadius: '4px', py: '6px', display: 'flex', justifyContent: 'center' }}>
+          <Typography sx={{ color: 'error.main', fontSize: 10, fontFamily: 'IBM Plex Sans, sans-serif', letterSpacing: '0.0075em' }}>
+            {t_i18n('Original Value')}
+          </Typography>
+        </Box>
+        <Box sx={{ flex: 1, backgroundColor: 'background.default', borderLeft: '2px solid', borderLeftColor: 'success.main', borderRadius: '4px', py: '6px', display: 'flex', justifyContent: 'center' }}>
+          <Typography sx={{ color: 'success.main', fontSize: 10, fontFamily: 'IBM Plex Sans, sans-serif', letterSpacing: '0.0075em' }}>
+            {t_i18n('New value')}
+          </Typography>
+        </Box>
+      </Box>
+
+      {changes.length === 0 ? (
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2 }}>
+          {t_i18n('No field changes detected for this entity')}
+        </Typography>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {changes.map((row) => (
+            <Box key={row.field} sx={{ backgroundColor: 'background.paper', borderRadius: '4px', p: '8px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <Typography sx={{ color: 'text.secondary', fontWeight: 500, fontSize: 12, fontFamily: 'IBM Plex Sans, sans-serif', letterSpacing: '0.0075em' }}>
+                {t_i18n(formatFieldKey(row.field, labelMap)) ?? ''}
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'row', gap: '16px' }}>
+                <Box sx={{ flex: 1, fontSize: 14, fontFamily: 'IBM Plex Sans, sans-serif', letterSpacing: '0.0075em' }}>
+                  {renderChangeValues(row.removed, true)}
+                </Box>
+                <Box sx={{ flex: 1, fontSize: 14, fontFamily: 'IBM Plex Sans, sans-serif', letterSpacing: '0.0075em' }}>
+                  {renderChangeValues(row.added, false)}
+                </Box>
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: 844 }}>
       {renderHeader()}
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <Typography sx={{ color: 'text.secondary', fontSize: 12, fontFamily: 'IBM Plex Sans, sans-serif', letterSpacing: '0.0075em', mb: '8px' }}>
-          {t_i18n('Container’s Fields')}
-        </Typography>
+      {renderFieldsTab()}
 
-        <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '7px', width: '100%', mb: '8px' }}>
-          <Box sx={{ flex: 1, backgroundColor: 'background.default', borderLeft: '1px solid', borderLeftColor: 'error.main', borderRadius: '4px', py: '6px', display: 'flex', justifyContent: 'center' }}>
-            <Typography sx={{ color: 'error.main', fontSize: 10, fontFamily: 'IBM Plex Sans, sans-serif', letterSpacing: '0.0075em' }}>
-              {t_i18n('Original Value')}
-            </Typography>
-          </Box>
-          <Box sx={{ flex: 1, backgroundColor: 'background.default', borderLeft: '2px solid', borderLeftColor: 'success.main', borderRadius: '4px', py: '6px', display: 'flex', justifyContent: 'center' }}>
-            <Typography sx={{ color: 'success.main', fontSize: 10, fontFamily: 'IBM Plex Sans, sans-serif', letterSpacing: '0.0075em' }}>
-              {t_i18n('New value')}
-            </Typography>
-          </Box>
-        </Box>
-
-        {changes.length === 0 ? (
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2 }}>
-            {t_i18n('No field changes detected for this entity')}
+      {isContainer && (
+        <Suspense fallback={<Loader />}>
+          <Typography variant="h3" sx={{ mb: 1, fontSize: 12, fontFamily: 'IBM Plex Sans, sans-serif' }}>
+            {t_i18n('Data in container')}
           </Typography>
-        ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {changes.map((row) => (
-              <Box key={row.field} sx={{ backgroundColor: 'background.paper', borderRadius: '4px', p: '8px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <Typography sx={{ color: 'text.secondary', fontWeight: 500, fontSize: 12, fontFamily: 'IBM Plex Sans, sans-serif', letterSpacing: '0.0075em' }}>
-                  {t_i18n(formatFieldKey(row.field)) ?? ''}
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'row', gap: '16px' }}>
-                  <Box sx={{ flex: 1, fontSize: 14, fontFamily: 'IBM Plex Sans, sans-serif', letterSpacing: '0.0075em' }}>
-                    {renderChangeValues(row.removed, true)}
-                  </Box>
-                  <Box sx={{ flex: 1, fontSize: 14, fontFamily: 'IBM Plex Sans, sans-serif', letterSpacing: '0.0075em' }}>
-                    {renderChangeValues(row.added, false)}
-                  </Box>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        )}
-      </Box>
+          <ContainerObjectsTab draftId={draftId} containerId={entityId} />
+        </Suspense>
+      )}
     </Box>
   );
 };

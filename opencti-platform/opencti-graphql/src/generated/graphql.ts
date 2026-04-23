@@ -7739,6 +7739,14 @@ export type DomainNameAddInput = {
   value: Scalars['String']['input'];
 };
 
+export type DraftContainerObjectChange = {
+  __typename?: 'DraftContainerObjectChange';
+  draft_operation: Scalars['String']['output'];
+  entity_id: Scalars['String']['output'];
+  entity_type: Scalars['String']['output'];
+  representative_main?: Maybe<Scalars['String']['output']>;
+};
+
 export type DraftEntityRead = BasicObject & InternalObject & {
   __typename?: 'DraftEntityRead';
   draft_id: Scalars['String']['output'];
@@ -24114,6 +24122,7 @@ export type Query = {
   disseminationLists?: Maybe<DisseminationListConnection>;
   draftEntityRead?: Maybe<DraftEntityRead>;
   draftWorkspace?: Maybe<DraftWorkspace>;
+  draftWorkspaceContainerObjects: Array<DraftContainerObjectChange>;
   draftWorkspaceEntities?: Maybe<StixCoreObjectConnection>;
   draftWorkspaceRelationships?: Maybe<StixRelationshipConnection>;
   draftWorkspaceSightingRelationships?: Maybe<StixSightingRelationshipConnection>;
@@ -24986,6 +24995,12 @@ export type QueryDraftEntityReadArgs = {
 
 export type QueryDraftWorkspaceArgs = {
   id: Scalars['String']['input'];
+};
+
+
+export type QueryDraftWorkspaceContainerObjectsArgs = {
+  containerId: Scalars['String']['input'];
+  draftId: Scalars['String']['input'];
 };
 
 
@@ -39038,6 +39053,7 @@ export type ResolversTypes = ResolversObject<{
   DocsMetrics: ResolverTypeWrapper<DocsMetrics>;
   DomainName: ResolverTypeWrapper<Omit<DomainName, 'cases' | 'connectors' | 'containers' | 'createdBy' | 'editContext' | 'exportFiles' | 'externalReferences' | 'groupings' | 'importFiles' | 'indicators' | 'jobs' | 'notes' | 'objectLabel' | 'objectMarking' | 'objectOrganization' | 'observedData' | 'opinions' | 'pendingFiles' | 'reports' | 'stixCoreObjectsDistribution' | 'stixCoreRelationships' | 'stixCoreRelationshipsDistribution' | 'x_opencti_inferences'> & { cases?: Maybe<ResolversTypes['CaseConnection']>, connectors?: Maybe<Array<Maybe<ResolversTypes['Connector']>>>, containers?: Maybe<ResolversTypes['ContainerConnection']>, createdBy?: Maybe<ResolversTypes['Identity']>, editContext?: Maybe<Array<ResolversTypes['EditUserContext']>>, exportFiles?: Maybe<ResolversTypes['FileConnection']>, externalReferences?: Maybe<ResolversTypes['ExternalReferenceConnection']>, groupings?: Maybe<ResolversTypes['GroupingConnection']>, importFiles?: Maybe<ResolversTypes['FileConnection']>, indicators?: Maybe<ResolversTypes['IndicatorConnection']>, jobs?: Maybe<Array<Maybe<ResolversTypes['Work']>>>, notes?: Maybe<ResolversTypes['NoteConnection']>, objectLabel?: Maybe<Array<ResolversTypes['Label']>>, objectMarking?: Maybe<Array<ResolversTypes['MarkingDefinition']>>, objectOrganization?: Maybe<Array<ResolversTypes['Organization']>>, observedData?: Maybe<ResolversTypes['ObservedDataConnection']>, opinions?: Maybe<ResolversTypes['OpinionConnection']>, pendingFiles?: Maybe<ResolversTypes['FileConnection']>, reports?: Maybe<ResolversTypes['ReportConnection']>, stixCoreObjectsDistribution?: Maybe<Array<Maybe<ResolversTypes['Distribution']>>>, stixCoreRelationships?: Maybe<ResolversTypes['StixCoreRelationshipConnection']>, stixCoreRelationshipsDistribution?: Maybe<Array<Maybe<ResolversTypes['Distribution']>>>, x_opencti_inferences?: Maybe<Array<Maybe<ResolversTypes['Inference']>>> }>;
   DomainNameAddInput: DomainNameAddInput;
+  DraftContainerObjectChange: ResolverTypeWrapper<DraftContainerObjectChange>;
   DraftEntityRead: ResolverTypeWrapper<DraftEntityRead>;
   DraftObjectsCount: ResolverTypeWrapper<DraftObjectsCount>;
   DraftOperation: DraftOperation;
@@ -40108,6 +40124,7 @@ export type ResolversParentTypes = ResolversObject<{
   DocsMetrics: DocsMetrics;
   DomainName: Omit<DomainName, 'cases' | 'connectors' | 'containers' | 'createdBy' | 'editContext' | 'exportFiles' | 'externalReferences' | 'groupings' | 'importFiles' | 'indicators' | 'jobs' | 'notes' | 'objectLabel' | 'objectMarking' | 'objectOrganization' | 'observedData' | 'opinions' | 'pendingFiles' | 'reports' | 'stixCoreObjectsDistribution' | 'stixCoreRelationships' | 'stixCoreRelationshipsDistribution' | 'x_opencti_inferences'> & { cases?: Maybe<ResolversParentTypes['CaseConnection']>, connectors?: Maybe<Array<Maybe<ResolversParentTypes['Connector']>>>, containers?: Maybe<ResolversParentTypes['ContainerConnection']>, createdBy?: Maybe<ResolversParentTypes['Identity']>, editContext?: Maybe<Array<ResolversParentTypes['EditUserContext']>>, exportFiles?: Maybe<ResolversParentTypes['FileConnection']>, externalReferences?: Maybe<ResolversParentTypes['ExternalReferenceConnection']>, groupings?: Maybe<ResolversParentTypes['GroupingConnection']>, importFiles?: Maybe<ResolversParentTypes['FileConnection']>, indicators?: Maybe<ResolversParentTypes['IndicatorConnection']>, jobs?: Maybe<Array<Maybe<ResolversParentTypes['Work']>>>, notes?: Maybe<ResolversParentTypes['NoteConnection']>, objectLabel?: Maybe<Array<ResolversParentTypes['Label']>>, objectMarking?: Maybe<Array<ResolversParentTypes['MarkingDefinition']>>, objectOrganization?: Maybe<Array<ResolversParentTypes['Organization']>>, observedData?: Maybe<ResolversParentTypes['ObservedDataConnection']>, opinions?: Maybe<ResolversParentTypes['OpinionConnection']>, pendingFiles?: Maybe<ResolversParentTypes['FileConnection']>, reports?: Maybe<ResolversParentTypes['ReportConnection']>, stixCoreObjectsDistribution?: Maybe<Array<Maybe<ResolversParentTypes['Distribution']>>>, stixCoreRelationships?: Maybe<ResolversParentTypes['StixCoreRelationshipConnection']>, stixCoreRelationshipsDistribution?: Maybe<Array<Maybe<ResolversParentTypes['Distribution']>>>, x_opencti_inferences?: Maybe<Array<Maybe<ResolversParentTypes['Inference']>>> };
   DomainNameAddInput: DomainNameAddInput;
+  DraftContainerObjectChange: DraftContainerObjectChange;
   DraftEntityRead: DraftEntityRead;
   DraftObjectsCount: DraftObjectsCount;
   DraftVersion: DraftVersion;
@@ -43379,6 +43396,13 @@ export type DomainNameResolvers<ContextType = any, ParentType extends ResolversP
   x_opencti_score?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   x_opencti_stix_ids?: Resolver<Maybe<Array<Maybe<ResolversTypes['StixId']>>>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+}>;
+
+export type DraftContainerObjectChangeResolvers<ContextType = any, ParentType extends ResolversParentTypes['DraftContainerObjectChange'] = ResolversParentTypes['DraftContainerObjectChange']> = ResolversObject<{
+  draft_operation?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  entity_id?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  entity_type?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  representative_main?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
 }>;
 
 export type DraftEntityReadResolvers<ContextType = any, ParentType extends ResolversParentTypes['DraftEntityRead'] = ResolversParentTypes['DraftEntityRead']> = ResolversObject<{
@@ -48415,6 +48439,7 @@ export type QueryResolvers<ContextType = any, ParentType extends ResolversParent
   disseminationLists?: Resolver<Maybe<ResolversTypes['DisseminationListConnection']>, ParentType, ContextType, Partial<QueryDisseminationListsArgs>>;
   draftEntityRead?: Resolver<Maybe<ResolversTypes['DraftEntityRead']>, ParentType, ContextType, RequireFields<QueryDraftEntityReadArgs, 'draftId' | 'entityId'>>;
   draftWorkspace?: Resolver<Maybe<ResolversTypes['DraftWorkspace']>, ParentType, ContextType, RequireFields<QueryDraftWorkspaceArgs, 'id'>>;
+  draftWorkspaceContainerObjects?: Resolver<Array<ResolversTypes['DraftContainerObjectChange']>, ParentType, ContextType, RequireFields<QueryDraftWorkspaceContainerObjectsArgs, 'containerId' | 'draftId'>>;
   draftWorkspaceEntities?: Resolver<Maybe<ResolversTypes['StixCoreObjectConnection']>, ParentType, ContextType, RequireFields<QueryDraftWorkspaceEntitiesArgs, 'draftId'>>;
   draftWorkspaceRelationships?: Resolver<Maybe<ResolversTypes['StixRelationshipConnection']>, ParentType, ContextType, RequireFields<QueryDraftWorkspaceRelationshipsArgs, 'draftId'>>;
   draftWorkspaceSightingRelationships?: Resolver<Maybe<ResolversTypes['StixSightingRelationshipConnection']>, ParentType, ContextType, RequireFields<QueryDraftWorkspaceSightingRelationshipsArgs, 'draftId'>>;
@@ -52331,6 +52356,7 @@ export type Resolvers<ContextType = any> = ResolversObject<{
   Distribution?: DistributionResolvers<ContextType>;
   DocsMetrics?: DocsMetricsResolvers<ContextType>;
   DomainName?: DomainNameResolvers<ContextType>;
+  DraftContainerObjectChange?: DraftContainerObjectChangeResolvers<ContextType>;
   DraftEntityRead?: DraftEntityReadResolvers<ContextType>;
   DraftObjectsCount?: DraftObjectsCountResolvers<ContextType>;
   DraftVersion?: DraftVersionResolvers<ContextType>;

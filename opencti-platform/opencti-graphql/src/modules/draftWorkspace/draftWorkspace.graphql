@@ -4,6 +4,13 @@ enum DraftStatus {
     validated
 }
 
+type DraftContainerObjectChange {
+    entity_id: String!
+    entity_type: String!
+    representative_main: String
+    draft_operation: String!
+}
+
 type DraftWorkspace implements InternalObject & BasicObject {
     id: ID!
     entity_type: String!
@@ -86,6 +93,10 @@ type Query {
         filters: FilterGroup
         search: String
     ): StixCoreObjectConnection @auth(for: [KNOWLEDGE])
+    draftWorkspaceContainerObjects(
+        draftId: String!
+        containerId: String!
+    ): [DraftContainerObjectChange!]! @auth(for: [KNOWLEDGE])
     draftWorkspaceRelationships(
         draftId: String!,
         types: [String]
