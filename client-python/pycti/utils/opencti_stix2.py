@@ -320,13 +320,13 @@ class OpenCTIStix2:
                 entity[key] = self._rewrite_markdown_embedded_storage_images(value)
             elif isinstance(value, list):
                 entity[key] = [
-                (
+                    (
                         self._rewrite_markdown_embedded_storage_images(item)
                         if isinstance(item, str)
                         else item
-                )
+                    )
                     for item in value
-            ]
+                ]
 
     def format_date(self, date: Any = None) -> str:
         """Convert multiple input date formats to OpenCTI style dates.
