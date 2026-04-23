@@ -90,6 +90,7 @@ type WorkflowTransition {
     toState: String!
     toStatus: Status
     actions: [String!]
+    requiresOrganizationInput: Boolean
 }
 
 type WorkflowInstance {
@@ -116,7 +117,7 @@ extend type Query {
 extend type Mutation {
     workflowDefinitionSet(entityType: String!, definition: String!): EntitySetting @auth(for: [SETTINGS_SETCUSTOMIZATION])
     workflowDefinitionDelete(entityType: String!): EntitySetting @auth(for: [SETTINGS_SETCUSTOMIZATION])
-    triggerWorkflowEvent(entityId: String!, eventName: String!): WorkflowTriggerResult! @auth(for: [KNOWLEDGE_KNUPDATE])
+    triggerWorkflowEvent(entityId: String!, eventName: String!, runtimeParams: JSON): WorkflowTriggerResult! @auth(for: [KNOWLEDGE_KNUPDATE])
     resolvePendingWorkflowTransition(entityId: String!, success: Boolean!, reason: String): WorkflowTriggerResult! @auth(for: [KNOWLEDGE_KNUPDATE])
     retryPendingWorkflowTransitionActions(entityId: String!, actionIds: [String!]): WorkflowTriggerResult! @auth(for: [KNOWLEDGE_KNUPDATE])
 }

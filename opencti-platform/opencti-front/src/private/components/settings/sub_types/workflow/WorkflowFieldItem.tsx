@@ -69,7 +69,7 @@ const WorkflowFieldItem = ({ field, onDelete }: WorkflowFieldItemProps) => {
                   <Field component={TextField} name={`${name}.params.description`} label={t_i18n('Description')} variant="standard" fullWidth />
                   <ObjectOrganizationField
                     name={`${name}.params.actions[0].context.values`}
-                    label={t_i18n('Organizations')}
+                    label={t_i18n('Default organizations (leave empty to let users choose at trigger)')}
                     multiple={true}
                     alert={false}
                     outlined={false}

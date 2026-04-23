@@ -1,5 +1,7 @@
 import React, { FunctionComponent, useState } from 'react';
+import { Formik, Form } from 'formik';
 import { graphql, useFragment, useMutation } from 'react-relay';
+import ObjectOrganizationField from '../form/ObjectOrganizationField';
 import {
   Alert,
   AlertTitle,
@@ -63,6 +65,7 @@ export const workflowStatusFragment = graphql`
         event
         toState
         actions
+        requiresOrganizationInput
         toStatus {
           id
           template {
@@ -76,8 +79,8 @@ export const workflowStatusFragment = graphql`
 `;
 
 const workflowStatusTriggerMutation = graphql`
-  mutation WorkflowStatusTriggerMutation($entityId: String!, $eventName: String!) {
-    triggerWorkflowEvent(entityId: $entityId, eventName: $eventName) {
+  mutation WorkflowStatusTriggerMutation($entityId: String!, $eventName: String!, $runtimeParams: JSON) {
+    triggerWorkflowEvent(entityId: $entityId, eventName: $eventName, runtimeParams: $runtimeParams) {
       success
       reason
       newState
@@ -249,6 +252,7 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [validationTransition, setValidationTransition] = useState<string | null>(null);
+  const [sharingTransition, setSharingTransition] = useState<{ event: string; operation: 'share' | 'unshare' } | null>(null);
 
   const draft = useFragment(workflowStatusFragment, data);
   const { exitDraft } = useSwitchDraft();
@@ -278,13 +282,17 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
     setAnchorEl(null);
   };
 
-  const handleTransition = (eventName: string, actions: readonly string[]) => {
+  const handleTransition = (eventName: string, actions: readonly string[], requiresOrgInput?: boolean | null) => {
     if (isPending) {
       return;
     }
     if (actions.includes('validateDraft')) {
       handleClose();
       setValidationTransition(eventName);
+    } else if (requiresOrgInput) {
+      handleClose();
+      const operation = actions.includes('unshareFromOrganization') ? 'unshare' : 'share';
+      setSharingTransition({ event: eventName, operation });
     } else {
       commit({
         variables: {
@@ -301,6 +309,28 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
         },
       });
     }
+  };
+
+  const handleSharingTransition = (orgValues: Array<{ value: string }>) => {
+    if (!sharingTransition) return;
+    const orgIds = orgValues.map((o) => o.value);
+    const operation = sharingTransition.operation === 'unshare' ? 'UNSHARE' : 'SHARE';
+    setSharingTransition(null);
+    commit({
+      variables: {
+        entityId: draft.id,
+        eventName: sharingTransition.event,
+        runtimeParams: {
+          organizationIds: orgIds,
+        },
+      },
+      onCompleted: (response) => {
+        const result = (response as any).triggerWorkflowEvent;
+        if (result && !result.success && result.executionStatus !== 'pending' && !result.instance) {
+          MESSAGING$.notifyError(result.reason || t_i18n('Workflow transition failed'));
+        }
+      },
+    });
   };
 
   const handleValidateDraft = () => {
@@ -454,12 +484,54 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
         {workflowInstance.allowedTransitions.map((transition) => (
           <MenuItem
             key={transition.event}
-            onClick={() => handleTransition(transition.event, transition.actions ?? [])}
+            onClick={() => handleTransition(transition.event, transition.actions ?? [], transition.requiresOrganizationInput)}
           >
             {transition.event}
           </MenuItem>
         ))}
       </Menu>
+      <Formik
+        key={sharingTransition ? `${sharingTransition.event}-${sharingTransition.operation}` : 'closed'}
+        initialValues={{ objectOrganizations: [] as Array<{ value: string; label: string }> }}
+        onSubmit={(values) => handleSharingTransition(values.objectOrganizations)}
+      >
+        {({ submitForm, values, isSubmitting }) => (
+          <Dialog
+            open={Boolean(sharingTransition)}
+            slotProps={{ paper: { elevation: 1 } }}
+            keepMounted={false}
+            slots={{ transition: Transition }}
+            onClose={() => setSharingTransition(null)}
+            title={sharingTransition?.operation === 'unshare' ? t_i18n('Unshare from organizations') : t_i18n('Share with organizations')}
+            size="small"
+          >
+            <DialogContentText>
+              {sharingTransition?.operation === 'unshare'
+                ? t_i18n('Select organizations to unshare draft entities from.')
+                : t_i18n('Select organizations to share draft entities with.')}
+            </DialogContentText>
+            <Form>
+              <ObjectOrganizationField
+                name="objectOrganizations"
+                label={t_i18n('Organizations')}
+                style={{ width: '100%', marginTop: 16 }}
+                multiple
+              />
+            </Form>
+            <DialogActions>
+              <Button variant="secondary" onClick={() => setSharingTransition(null)}>
+                {t_i18n('Cancel')}
+              </Button>
+              <Button
+                onClick={submitForm}
+                disabled={approving || isSubmitting || values.objectOrganizations.length === 0}
+              >
+                {t_i18n('Confirm')}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
+      </Formik>
       <Dialog
         open={Boolean(validationTransition)}
         slotProps={{ paper: { elevation: 1 } }}

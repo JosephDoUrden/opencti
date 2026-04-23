@@ -19723,6 +19723,7 @@ export type MutationTriggerKnowledgeLiveAddArgs = {
 export type MutationTriggerWorkflowEventArgs = {
   entityId: Scalars['String']['input'];
   eventName: Scalars['String']['input'];
+  runtimeParams?: InputMaybe<Scalars['JSON']['input']>;
 };
 
 
@@ -37629,6 +37630,7 @@ export type WorkflowTransition = {
   __typename?: 'WorkflowTransition';
   actions?: Maybe<Array<Scalars['String']['output']>>;
   event: Scalars['String']['output'];
+  requiresOrganizationInput?: Maybe<Scalars['Boolean']['output']>;
   toState: Scalars['String']['output'];
   toStatus?: Maybe<Status>;
 };
@@ -52200,6 +52202,7 @@ export type WorkflowSerializedTransitionResolvers<ContextType = any, ParentType 
 export type WorkflowTransitionResolvers<ContextType = any, ParentType extends ResolversParentTypes['WorkflowTransition'] = ResolversParentTypes['WorkflowTransition']> = ResolversObject<{
   actions?: Resolver<Maybe<Array<ResolversTypes['String']>>, ParentType, ContextType>;
   event?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  requiresOrganizationInput?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
   toState?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   toStatus?: Resolver<Maybe<ResolversTypes['Status']>, ParentType, ContextType>;
 }>;

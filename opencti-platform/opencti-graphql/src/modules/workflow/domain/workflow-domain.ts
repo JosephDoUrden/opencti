@@ -75,6 +75,35 @@ const validateTransitionAsyncActions = (_definitionObj: any) => {
 };
 
 /**
+ * Injects organization IDs into any SHARE/UNSHARE sub-actions of a backgroundListTask params blob.
+ * This is case-insensitive on the sub-action type (supports both 'share' and 'SHARE').
+ * Only the `context.values` field is modified; all other params come from the definition.
+ */
+const injectOrganizationIds = (baseParams: any, orgIds: string[]): any => {
+  if (!orgIds.length) return baseParams;
+  const baseActions: any[] = baseParams?.actions ?? [];
+  const mergedActions = baseActions.map((base: any) => {
+    const type = String(base?.type ?? '').toUpperCase();
+    if (type !== 'SHARE' && type !== 'UNSHARE') return base;
+    return {
+      ...base,
+      context: {
+        ...(base.context ?? {}),
+        values: orgIds,
+      },
+    };
+  });
+  return { ...baseParams, actions: mergedActions };
+};
+
+const hasShareUnshareSubAction = (params: any): boolean => {
+  return (params?.actions ?? []).some((a: any) => {
+    const type = String(a?.type ?? '').toUpperCase();
+    return type === 'SHARE' || type === 'UNSHARE';
+  });
+};
+
+/**
  * Splits a flat action list into phases: one phase per async action (plus its preceding
  * sync actions), with an optional trailing sync-only phase if the list ends with syncs.
  *
@@ -344,10 +373,28 @@ export const getAllowedTransitions = async (
   const transitions = definition.getTransitions(effectiveStateId);
 
   const resolvedTransitions = transitions.map((t) => {
+    const schemaTransition = definitionData.transitions.find((st: any) => (
+      st.from === effectiveStateId && st.to === t.to && st.event === t.event
+    ));
+    const requiresOrganizationInput = (schemaTransition?.actions ?? []).some((a: any) => {
+      if (a.mode !== 'async') return false;
+      const subActions: any[] = a.params?.actions ?? [];
+      const hasShareUnshare = subActions.some((inner: any) => {
+        const type = String(inner?.type ?? '').toUpperCase();
+        return type === 'SHARE' || type === 'UNSHARE';
+      });
+      if (!hasShareUnshare) return false;
+      const hasBakedOrgs = subActions.some((inner: any) => {
+        const type = String(inner?.type ?? '').toUpperCase();
+        return (type === 'SHARE' || type === 'UNSHARE') && (inner?.context?.values ?? []).length > 0;
+      });
+      return !hasBakedOrgs;
+    });
     return {
       event: t.event,
       toState: t.to,
       actions: t.actionTypes || [],
+      requiresOrganizationInput: requiresOrganizationInput || null,
     };
   });
 
@@ -381,6 +428,7 @@ export const triggerWorkflowEvent = async (
   user: AuthUser,
   entityId: string,
   eventName: string,
+  runtimeParams?: Record<string, unknown>,
 ): Promise<TriggerResult> => {
   // Bypass draft context for workflow state-machine persistence.
   // Action execution keeps original context to preserve draft-aware behavior.
@@ -491,7 +539,11 @@ export const triggerWorkflowEvent = async (
       }
 
       const asyncDef0 = phase0.asyncActionDef!;
-      const actionResult0 = await ActionRegistry[asyncDef0.type]!(workflowActionContext, asyncDef0.params);
+      const runtimeOrgIds: string[] = (runtimeParams?.organizationIds as string[]) ?? [];
+      const mergedParams0 = (runtimeOrgIds.length > 0 && hasShareUnshareSubAction(asyncDef0.params))
+        ? injectOrganizationIds(asyncDef0.params, runtimeOrgIds)
+        : asyncDef0.params;
+      const actionResult0 = await ActionRegistry[asyncDef0.type]!(workflowActionContext, mergedParams0);
       if (!actionResult0 || typeof actionResult0 !== 'object' || !actionResult0.workId) {
         return { success: false, executionStatus: 'failed', reason: `Async action '${asyncDef0.type}' didn't return a valid workId.`, entity };
       }
@@ -499,7 +551,7 @@ export const triggerWorkflowEvent = async (
       const phase0AsyncAction: WorkflowPendingAsyncAction = {
         id: `${asyncDef0.type}-0`,
         type: asyncDef0.type,
-        params: asyncDef0.params,
+        params: mergedParams0,
         status: 'pending',
         taskId: actionResult0.taskId,
         workId: actionResult0.workId,

@@ -10466,7 +10466,7 @@ type Mutation {
   stixSightingRelationshipEdit(id: ID!): StixSightingRelationshipEditMutations
   workflowDefinitionSet(entityType: String!, definition: String!): EntitySetting
   workflowDefinitionDelete(entityType: String!): EntitySetting
-  triggerWorkflowEvent(entityId: String!, eventName: String!): WorkflowTriggerResult!
+  triggerWorkflowEvent(entityId: String!, eventName: String!, runtimeParams: JSON): WorkflowTriggerResult!
   resolvePendingWorkflowTransition(entityId: String!, success: Boolean!, reason: String): WorkflowTriggerResult!
   retryPendingWorkflowTransitionActions(entityId: String!, actionIds: [String!]): WorkflowTriggerResult!
   channelAdd(input: ChannelAddInput!): Channel
@@ -10885,6 +10885,7 @@ type WorkflowTransition {
   toState: String!
   toStatus: Status
   actions: [String!]
+  requiresOrganizationInput: Boolean
 }
 
 type WorkflowInstance {
