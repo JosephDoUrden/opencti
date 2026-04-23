@@ -12,7 +12,19 @@ import type { AsyncActionResult, Context } from '../types/workflow-types';
 
 export type ActionFunction<TContext extends Context = Context> = (ctx: TContext, params?: any) => Promise<void | AsyncActionResult> | void | AsyncActionResult;
 
-const SHARING_ACTION_TYPES = new Set(['SHARE', 'SHARE_MULTIPLE', 'UNSHARE', 'UNSHARE_MULTIPLE']);
+// Workflow definitions use SHARE/UNSHARE; these are remapped to the _MULTIPLE
+// variants internally since we always dispatch a list task.
+const SHARING_ACTION_REMAP: Record<string, string> = {
+  SHARE: 'SHARE_MULTIPLE',
+  UNSHARE: 'UNSHARE_MULTIPLE',
+};
+
+// Maps the workflow-facing action type (pre-remap) to the semantic target type
+// used in the action summary. Add new entries here as new action types are introduced.
+const TARGET_TYPE_BY_ACTION: Record<string, string> = {
+  SHARE: 'organization',
+  UNSHARE: 'organization',
+};
 
 const isShareableDraftElement = (element: any): boolean => {
   const draftOperation = element?.draft_change?.draft_operation;
@@ -40,16 +52,24 @@ export const ActionRegistry: Record<string, ActionFunction> = {
     const { entity, user, context } = ctx;
     const targetId = entity.internal_id || entity.id;
     let ids = params?.ids ?? [targetId];
-    const normalizedActions = (params?.actions ?? []).map((a: any) => ({
-      ...a,
-      type: typeof a?.type === 'string' ? a.type.toUpperCase() : a?.type,
-    }));
+
+    // Normalize action types: uppercase, then remap SHARE→SHARE_MULTIPLE etc.
+    const normalizedActions = (params?.actions ?? []).map((a: any) => {
+      const upperType = typeof a?.type === 'string' ? a.type.toUpperCase() : a?.type;
+      return { ...a, originalType: upperType, type: SHARING_ACTION_REMAP[upperType] ?? upperType };
+    });
+
     const normalizedActionSummary = normalizedActions
-      .map((a: any) => String(a?.type ?? ''))
+      .map((a: any) => String(a?.originalType ?? a?.type ?? ''))
       .filter((type: string) => type.length > 0)
       .map((type: string) => type.toLowerCase().replace(/_/g, ' '))
       .join(', ');
-    const hasSharingAction = normalizedActions.some((a: any) => SHARING_ACTION_TYPES.has(String(a?.type ?? '')));
+
+    // Determine if any action requires filtering to shareable elements only.
+    const hasSharingAction = normalizedActions.some((a: any) => {
+      const t = String(a?.originalType ?? a?.type ?? '');
+      return t === 'SHARE' || t === 'UNSHARE';
+    });
 
     if (entity.entity_type === 'DraftWorkspace' && !params?.ids) {
       const draftContext = { ...context, draft_context: targetId };
@@ -72,15 +92,25 @@ export const ActionRegistry: Record<string, ActionFunction> = {
     const input = {
       ids,
       scope: params?.scope,
-      actions: normalizedActions,
+      actions: normalizedActions.map(({ originalType: _o, ...rest }: any) => rest),
       description: params?.description ?? `Workflow async action (${normalizedActionSummary || 'task'}) for ${entity.internal_id || entity.id}`,
       orderMode: params?.orderMode,
     };
     const task = await createListTask(context, user, input);
-    return {
-      taskId: task?.id,
-      workId: task?.work_id,
+
+    // Build a summary describing what this action does, captured now while ids.length is known.
+    const primaryOriginalType = String(normalizedActions[0]?.originalType ?? '');
+    const targetType = TARGET_TYPE_BY_ACTION[primaryOriginalType];
+    const targetIds: string[] = normalizedActions.flatMap((a: any) => a?.context?.values ?? []);
+    const operation = primaryOriginalType.toLowerCase().replace(/_multiple$/, '');
+    const summary = {
+      affectedCount: ids.length,
+      ...(targetType ? { targetType } : {}),
+      ...(targetIds.length > 0 ? { targetIds } : {}),
+      ...(operation ? { operation } : {}),
     };
+
+    return { taskId: task?.id, workId: task?.work_id, summary };
   },
   // Alias to expose a clearer action name in workflow definitions while keeping compatibility.
   asyncListTask: async (ctx, params) => ActionRegistry.backgroundListTask(ctx, params),

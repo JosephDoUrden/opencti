@@ -1,7 +1,7 @@
 import { FunctionalError } from '../../../config/errors';
 import { logApp } from '../../../config/conf';
 import { createEntity, createRelation, loadEntity, updateAttribute } from '../../../database/middleware';
-import { fullEntitiesList, storeLoadById } from '../../../database/middleware-loader';
+import { storeLoadById } from '../../../database/middleware-loader';
 import { FilterMode } from '../../../generated/graphql';
 import { RELATION_HAS_WORKFLOW } from '../../../schema/internalRelationship';
 import type { AuthContext, AuthUser } from '../../../types/user';
@@ -24,7 +24,7 @@ interface WorkflowInstanceStoreEntity extends BasicStoreEntity {
   currentState: string;
   history: string;
   pending_status?: string;
-  pending_work_id?: string;
+  pending_work_ids?: string[];
   pending_transition?: string;
   pending_error?: string;
 }
@@ -44,53 +44,6 @@ const parsePendingTransition = (instanceEntity?: WorkflowInstanceStoreEntity | n
   } catch {
     return null;
   }
-};
-
-const getPendingTransitionWorkIds = (pendingTransition?: WorkflowPendingTransition | null): string[] => {
-  if (!pendingTransition) {
-    return [];
-  }
-  if (pendingTransition.asyncActions && pendingTransition.asyncActions.length > 0) {
-    const trackedFromActions = pendingTransition.asyncActions
-      .map((action) => action.workId)
-      .filter((id): id is string => !!id);
-    return Array.from(new Set(trackedFromActions));
-  }
-  const workIds = pendingTransition.workIds && pendingTransition.workIds.length > 0
-    ? pendingTransition.workIds
-    : (pendingTransition.workId ? [pendingTransition.workId] : []);
-  return Array.from(new Set(workIds.filter((id): id is string => !!id)));
-};
-
-const syncPendingTransitionTracking = (pendingTransition: WorkflowPendingTransition): WorkflowPendingTransition => {
-  if (!pendingTransition.asyncActions || pendingTransition.asyncActions.length === 0) {
-    return pendingTransition;
-  }
-
-  const allWorkIds = Array.from(new Set(
-    pendingTransition.asyncActions
-      .map((action) => action.workId)
-      .filter((id): id is string => !!id),
-  ));
-
-  const pendingWorkIds = pendingTransition.asyncActions
-    .filter((action) => action.status === 'pending')
-    .map((action) => action.workId)
-    .filter((id): id is string => !!id);
-
-  const completedWorkIds = Array.from(new Set(
-    pendingTransition.asyncActions
-      .filter((action) => action.status === 'success')
-      .map((action) => action.workId)
-      .filter((id): id is string => !!id),
-  ));
-
-  return {
-    ...pendingTransition,
-    workId: pendingWorkIds[0],
-    workIds: allWorkIds.length > 0 ? allWorkIds : undefined,
-    completedWorkIds,
-  };
 };
 
 const normalizePendingStatus = (status?: string | null): string | null => {
@@ -523,22 +476,25 @@ export const triggerWorkflowEvent = async (
           status: 'pending',
           taskId: actionResult.taskId,
           workId: actionResult.workId,
+          summary: actionResult.summary,
         });
       }
 
-      const pendingTransition = syncPendingTransitionTracking({
+      const pendingWorkIds = asyncActionExecutions
+        .map((a) => a.workId)
+        .filter((id): id is string => !!id);
+      const pendingTransition: WorkflowPendingTransition = {
         id: `${eventName}-${Date.now()}`,
         event: eventName,
         fromState: transition.from,
         toState: transition.to,
         startedAt: new Date().toISOString(),
-        taskId: asyncActionExecutions[0]?.taskId,
         asyncActions: asyncActionExecutions,
-      });
+      };
       const instanceId = instanceEntity.internal_id || instanceEntity.id;
       await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
         { key: 'pending_status', value: ['pending'] },
-        { key: 'pending_work_id', value: [pendingTransition.workId ?? null] },
+        { key: 'pending_work_ids', value: pendingWorkIds },
         { key: 'pending_transition', value: [JSON.stringify(pendingTransition)] },
         { key: 'pending_error', value: [null] },
       ]);
@@ -574,7 +530,7 @@ export const triggerWorkflowEvent = async (
         { key: 'currentState', value: [newState] },
         { key: 'history', value: [JSON.stringify(history)] },
         { key: 'pending_status', value: [null] },
-        { key: 'pending_work_id', value: [null] },
+        { key: 'pending_work_ids', value: [] },
         { key: 'pending_transition', value: [null] },
         { key: 'pending_error', value: [null] },
       ]);
@@ -609,7 +565,6 @@ export const resolvePendingWorkflowTransition = async (
   const executionUser = executionContext.user!;
   const effectiveEntityId = entity.internal_id || entity.id;
   const instanceEntity = await findWorkflowInstanceEntity(executionContext, executionUser, effectiveEntityId);
-  logApp.info('[WORKFLOW] resolvePendingWorkflowTransition', { entityId, found: !!instanceEntity, pending_status: instanceEntity?.pending_status, executionUser: executionUser?.id });
   if (!instanceEntity || !isPendingStatus(instanceEntity.pending_status)) {
     return { success: false, executionStatus: 'failed', reason: 'No pending transition to resolve.', entity };
   }
@@ -649,7 +604,7 @@ export const resolvePendingWorkflowTransition = async (
     { key: 'currentState', value: [pendingTransition.toState] },
     { key: 'history', value: [JSON.stringify(history)] },
     { key: 'pending_status', value: [null] },
-    { key: 'pending_work_id', value: [null] },
+    { key: 'pending_work_ids', value: [] },
     { key: 'pending_transition', value: [null] },
     { key: 'pending_error', value: [null] },
   ]);
@@ -665,156 +620,72 @@ export const resolvePendingWorkflowTransition = async (
 };
 
 export const resolvePendingWorkflowTransitionByWorkId = async (
-  context: AuthContext,
-  user: AuthUser,
+  _context: AuthContext,
+  _user: AuthUser,
   workId: string,
   success: boolean,
   reason?: string,
 ): Promise<void> => {
-  // Use SYSTEM_USER so workflow-instance look-ups succeed regardless of the
-  // calling user's capabilities (e.g. a connector user reporting work completion
-  // does not have access to internal WorkflowInstance entities).
+  // Use SYSTEM_USER so look-ups succeed regardless of the calling user's capabilities.
   const systemContext = createExecutionContext('workflow_resolution', SYSTEM_USER);
   const systemUser = SYSTEM_USER;
 
-  logApp.info('[WORKFLOW] resolvePendingWorkflowTransitionByWorkId called', { workId, success, reason });
-
-  let pendingInstance: WorkflowInstanceStoreEntity | null = await loadEntity(systemContext, systemUser, [ENTITY_TYPE_WORKFLOW_INSTANCE], {
+  const pendingInstance: WorkflowInstanceStoreEntity | null = await loadEntity(systemContext, systemUser, [ENTITY_TYPE_WORKFLOW_INSTANCE], {
     filters: {
       mode: FilterMode.And,
       filters: [
         { key: ['pending_status'], values: ['pending'] },
-        { key: ['pending_work_id'], values: [workId] },
+        { key: ['pending_work_ids'], values: [workId] },
       ],
       filterGroups: [],
     },
   }) as WorkflowInstanceStoreEntity;
 
-  logApp.info('[WORKFLOW] primary lookup result', { workId, found: !!pendingInstance, instanceId: pendingInstance?.id ?? pendingInstance?.internal_id });
-
-  // Fallback path for out-of-order async completion events: if a workId from
-  // the tracked list finishes before it becomes the current pending_work_id,
-  // find the matching pending transition by scanning pending instances.
-  if (!pendingInstance) {
-    const pendingInstances = await fullEntitiesList<WorkflowInstanceStoreEntity>(systemContext, systemUser, [ENTITY_TYPE_WORKFLOW_INSTANCE], {
-      filters: {
-        mode: FilterMode.And,
-        filters: [
-          { key: ['pending_status'], values: ['pending'] },
-        ],
-        filterGroups: [],
-      },
-    });
-    logApp.info('[WORKFLOW] fallback scan', { workId, totalPendingInstances: pendingInstances.length });
-    pendingInstance = pendingInstances.find((instance) => {
-      const pendingTransition = parsePendingTransition(instance);
-      const trackedWorkIds = getPendingTransitionWorkIds(pendingTransition);
-      return trackedWorkIds.includes(workId);
-    }) || null;
-    logApp.info('[WORKFLOW] fallback scan result', { workId, found: !!pendingInstance });
-  }
-
-  if (!pendingInstance) {
-    logApp.info('[WORKFLOW] no pending instance found for workId, skipping', { workId });
-    return;
-  }
+  if (!pendingInstance) return;
 
   const pendingTransition = parsePendingTransition(pendingInstance);
-  const trackedWorkIds = getPendingTransitionWorkIds(pendingTransition);
-  logApp.info('[WORKFLOW] pending instance found', { workId, instanceId: pendingInstance.id ?? pendingInstance.internal_id, trackedWorkIds, hasAsyncActions: !!pendingTransition?.asyncActions?.length, asyncActions: pendingTransition?.asyncActions });
+  if (!pendingTransition?.asyncActions?.length) return;
 
-  if (trackedWorkIds.length === 0 || !trackedWorkIds.includes(workId)) {
-    logApp.info('[WORKFLOW] workId not in trackedWorkIds, skipping', { workId, trackedWorkIds });
-    return;
-  }
-
-  const instanceId = pendingInstance.id || pendingInstance.internal_id;
-  const hasAsyncActionTracking = !!pendingTransition?.asyncActions?.length;
-
-  if (hasAsyncActionTracking) {
-    const asyncActions = (pendingTransition?.asyncActions ?? []).map((action) => ({ ...action }));
-    const matchedAction = asyncActions.find((action) => action.workId === workId);
-    logApp.info('[WORKFLOW] async tracking branch', { workId, matchedAction, asyncActions });
-    if (!matchedAction) {
-      logApp.info('[WORKFLOW] no matched action for workId, skipping', { workId, asyncActions });
-      return;
-    }
-
-    if (success) {
-      matchedAction.status = 'success';
-      matchedAction.error = undefined;
-    } else {
-      matchedAction.status = 'failed';
-      matchedAction.error = reason || 'Background work failed.';
-    }
-
-    const nextPendingTransition = syncPendingTransitionTracking({
-      ...pendingTransition!,
-      asyncActions,
-    });
-
-    const stillPendingActions = asyncActions.filter((action) => action.status === 'pending' && !!action.workId);
-    const failedActions = asyncActions.filter((action) => action.status === 'failed');
-    logApp.info('[WORKFLOW] after update', { workId, stillPendingActions: stillPendingActions.length, failedActions: failedActions.length });
-
-    if (!success || failedActions.length > 0) {
-      const failureReason = reason
-        || failedActions[0]?.error
-        || 'Pending transition failed.';
-      await updateAttribute(systemContext, systemUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
-        { key: 'pending_status', value: ['failed'] },
-        { key: 'pending_work_id', value: [stillPendingActions[0]?.workId ?? null] },
-        { key: 'pending_transition', value: [JSON.stringify(nextPendingTransition)] },
-        { key: 'pending_error', value: [failureReason] },
-      ]);
-      return;
-    }
-
-    if (stillPendingActions.length > 0) {
-      await updateAttribute(systemContext, systemUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
-        { key: 'pending_work_id', value: [stillPendingActions[0].workId] },
-        { key: 'pending_transition', value: [JSON.stringify(nextPendingTransition)] },
-      ]);
-      return;
-    }
-
-    logApp.info('[WORKFLOW] all async actions done, resolving transition', { workId, entityId: pendingInstance.entity_id });
-    await resolvePendingWorkflowTransition(
-      systemContext,
-      systemUser,
-      pendingInstance.entity_id,
-      true,
-      reason,
-    );
-    return;
-  }
+  const asyncActions = pendingTransition.asyncActions.map((a) => ({ ...a }));
+  const matchedAction = asyncActions.find((a) => a.workId === workId && a.status === 'pending');
+  if (!matchedAction) return;
 
   if (success) {
-    const completedWorkIds = Array.from(new Set([...(pendingTransition?.completedWorkIds ?? []), workId]));
-    const remainingWorkIds = trackedWorkIds.filter((id) => !completedWorkIds.includes(id));
-
-    if (remainingWorkIds.length > 0) {
-      const nextPendingTransition: WorkflowPendingTransition = {
-        ...pendingTransition!,
-        workId: remainingWorkIds[0],
-        workIds: trackedWorkIds.length > 1 ? trackedWorkIds : undefined,
-        completedWorkIds,
-      };
-      await updateAttribute(systemContext, systemUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
-        { key: 'pending_work_id', value: [remainingWorkIds[0]] },
-        { key: 'pending_transition', value: [JSON.stringify(nextPendingTransition)] },
-      ]);
-      return;
-    }
+    matchedAction.status = 'success';
+    matchedAction.error = undefined;
+  } else {
+    matchedAction.status = 'failed';
+    matchedAction.error = reason || 'Background work failed.';
   }
 
-  await resolvePendingWorkflowTransition(
-    systemContext,
-    systemUser,
-    pendingInstance.entity_id,
-    success,
-    reason,
-  );
+  const remainingPendingWorkIds = asyncActions
+    .filter((a) => a.status === 'pending' && !!a.workId)
+    .map((a) => a.workId as string);
+  const failedActions = asyncActions.filter((a) => a.status === 'failed');
+  const instanceId = pendingInstance.internal_id || pendingInstance.id;
+  const updatedTransition = { ...pendingTransition, asyncActions };
+
+  if (failedActions.length > 0) {
+    const failureReason = failedActions[0]?.error || 'Pending transition failed.';
+    await updateAttribute(systemContext, systemUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+      { key: 'pending_status', value: ['failed'] },
+      { key: 'pending_work_ids', value: remainingPendingWorkIds },
+      { key: 'pending_transition', value: [JSON.stringify(updatedTransition)] },
+      { key: 'pending_error', value: [failureReason] },
+    ]);
+    return;
+  }
+
+  if (remainingPendingWorkIds.length > 0) {
+    await updateAttribute(systemContext, systemUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+      { key: 'pending_work_ids', value: remainingPendingWorkIds },
+      { key: 'pending_transition', value: [JSON.stringify(updatedTransition)] },
+    ]);
+    return;
+  }
+
+  // All actions completed successfully — advance the transition.
+  await resolvePendingWorkflowTransition(systemContext, systemUser, pendingInstance.entity_id, true);
 };
 
 export const retryPendingWorkflowTransitionActions = async (
@@ -896,15 +767,15 @@ export const retryPendingWorkflowTransitionActions = async (
     action.error = undefined;
   }
 
-  const nextPendingTransition = syncPendingTransitionTracking({
-    ...pendingTransition,
-    asyncActions,
-  });
+  const nextPendingTransition = { ...pendingTransition, asyncActions };
+  const pendingWorkIds = asyncActions
+    .filter((a) => a.status === 'pending' && !!a.workId)
+    .map((a) => a.workId as string);
 
   const instanceId = instanceEntity.internal_id || instanceEntity.id;
   await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
     { key: 'pending_status', value: ['pending'] },
-    { key: 'pending_work_id', value: [nextPendingTransition.workId ?? null] },
+    { key: 'pending_work_ids', value: pendingWorkIds },
     { key: 'pending_transition', value: [JSON.stringify(nextPendingTransition)] },
     { key: 'pending_error', value: [null] },
   ]);
@@ -917,4 +788,76 @@ export const retryPendingWorkflowTransitionActions = async (
     instance: workflowInstance,
     entity,
   };
+};
+
+/**
+ * Called on each poll of a pending workflow instance. Accepts pre-fetched work results
+ * (to avoid a circular dependency with work.js) and reconciles the async-action tracking
+ * state — updating individual action statuses, and resolving or failing the transition
+ * once all actions have completed.
+ */
+export const reconcileWorkflowTransitionForEntity = async (
+  context: AuthContext,
+  user: AuthUser,
+  entityId: string,
+  workResults: Array<{ workId: string; success: boolean; error?: string }>,
+): Promise<void> => {
+  const executionContext = bypassDraftContext(context);
+  const executionUser = executionContext.user!;
+  const entity = await storeLoadById(executionContext, executionUser, entityId, 'Basic-Object');
+  if (!entity) return;
+
+  const effectiveEntityId = entity.internal_id || entity.id;
+  const instanceEntity = await findWorkflowInstanceEntity(executionContext, executionUser, effectiveEntityId) as WorkflowInstanceStoreEntity | null;
+  if (!instanceEntity || !isPendingStatus(instanceEntity.pending_status)) return;
+
+  const pendingTransition = parsePendingTransition(instanceEntity);
+  if (!pendingTransition?.asyncActions?.length) return;
+
+  const asyncActions = pendingTransition.asyncActions.map((a) => ({ ...a }));
+  let changed = false;
+
+  for (const result of workResults) {
+    const action = asyncActions.find((a) => a.workId === result.workId && a.status === 'pending');
+    if (!action) continue;
+    if (result.success) {
+      action.status = 'success';
+      action.error = undefined;
+    } else {
+      action.status = 'failed';
+      action.error = result.error || 'Background work failed.';
+    }
+    changed = true;
+  }
+
+  if (!changed) return;
+
+  const remainingPendingWorkIds = asyncActions
+    .filter((a) => a.status === 'pending' && !!a.workId)
+    .map((a) => a.workId as string);
+  const failedActions = asyncActions.filter((a) => a.status === 'failed');
+  const instanceId = instanceEntity.internal_id || instanceEntity.id;
+  const updatedTransition = { ...pendingTransition, asyncActions };
+
+  if (failedActions.length > 0) {
+    const failureReason = failedActions[0]?.error || 'Pending transition failed.';
+    await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+      { key: 'pending_status', value: ['failed'] },
+      { key: 'pending_work_ids', value: remainingPendingWorkIds },
+      { key: 'pending_transition', value: [JSON.stringify(updatedTransition)] },
+      { key: 'pending_error', value: [failureReason] },
+    ]);
+    return;
+  }
+
+  if (remainingPendingWorkIds.length > 0) {
+    await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+      { key: 'pending_work_ids', value: remainingPendingWorkIds },
+      { key: 'pending_transition', value: [JSON.stringify(updatedTransition)] },
+    ]);
+    return;
+  }
+
+  // All actions completed successfully — advance the transition.
+  await resolvePendingWorkflowTransition(executionContext, executionUser, entityId, true);
 };

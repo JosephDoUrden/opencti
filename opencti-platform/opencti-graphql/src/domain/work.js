@@ -1,12 +1,15 @@
 import moment from 'moment';
 import * as R from 'ramda';
-import { elDeleteInstances, elIndex, elLoadById, elPaginate, elRawDeleteByQuery, elUpdate, ES_MINIMUM_FIXED_PAGINATION } from '../database/engine';
+import { elDeleteInstances, elIndex, elList, elLoadById, elPaginate, elRawDeleteByQuery, elUpdate, ES_MINIMUM_FIXED_PAGINATION } from '../database/engine';
 import { generateWorkId } from '../schema/identifier';
-import { INDEX_HISTORY, isNotEmptyField, READ_INDEX_HISTORY } from '../database/utils';
+import { INDEX_HISTORY, isNotEmptyField, READ_INDEX_HISTORY, READ_INDEX_INTERNAL_OBJECTS } from '../database/utils';
 import { isWorkCompleted, redisDeleteWorks, redisGetWork, redisInitializeWork, redisUpdateActionExpectation, redisUpdateWorkFigures } from '../database/redis';
 import { ENTITY_TYPE_BACKGROUND_TASK, ENTITY_TYPE_CONNECTOR, ENTITY_TYPE_WORK } from '../schema/internalObject';
 import { now, sinceNowInMinutes } from '../utils/format';
 import { buildRefRelationKey, CONNECTOR_INTERNAL_EXPORT_FILE } from '../schema/general';
+
+// Workflow instances that have been pending for longer than this are considered stale.
+const WORKFLOW_PENDING_TIMEOUT_MINUTES = 60;
 import { publishUserAction } from '../listener/UserActionListener';
 import { AlreadyDeletedError, DatabaseError } from '../config/errors';
 import { addFilter } from '../utils/filtering/filtering-utils';
@@ -275,11 +278,9 @@ const updateWorkTaskToComplete = async (context, user, work) => {
 export const reportExpectation = async (context, user, workId, errorData) => {
   const timestamp = now();
   const { isComplete, total } = await redisUpdateWorkFigures(workId);
-  logApp.info('[WORKFLOW-TRACE] reportExpectation called', { workId, isComplete, total, hasError: !!errorData });
   // Ensure that work hasn't been deleted in the meantime
   const workAlive = await isWorkAlive(context, user, workId);
   if (!workAlive) {
-    logApp.info('[WORKFLOW-TRACE] reportExpectation: work no longer alive, skipping', { workId });
     await redisDeleteWorks(workId);
     return workId;
   }
@@ -309,7 +310,6 @@ export const reportExpectation = async (context, user, workId, errorData) => {
         const finalizedWork = await loadWorkById(context, user, workId);
         const hasErrors = (finalizedWork?.errors?.length ?? 0) > 0;
         const failureReason = hasErrors ? (finalizedWork?.errors?.[0]?.message || 'Background work failed') : undefined;
-        logApp.info('[WORKFLOW-TRACE] reportExpectation: calling resolvePendingWorkflowTransitionByWorkId', { workId, hasErrors, failureReason });
         await resolvePendingWorkflowTransitionByWorkId(context, user, workId, !hasErrors, failureReason);
       }
     } else {
@@ -410,14 +410,12 @@ export const updateProcessedTime = async (context, user, workId, message, inErro
   // Update elastic
   await elUpdate(currentWork._index, workId, { script: { source, lang: 'painless', params } });
   // Ensure task and workflow transition states are aligned when work reaches completion through processed events.
-  logApp.info('[WORKFLOW-TRACE] updateProcessedTime check', { workId, import_expected_number: currentWork.import_expected_number, isComplete });
   if (currentWork.import_expected_number === 0 || isComplete) {
     const finalizedWork = await loadWorkById(context, user, workId);
     if (finalizedWork) {
       await updateWorkTaskToComplete(context, user, finalizedWork);
       const hasErrors = (finalizedWork.errors?.length ?? 0) > 0;
       const failureReason = hasErrors ? (finalizedWork.errors?.[0]?.message || message || 'Background work failed') : undefined;
-      logApp.info('[WORKFLOW-TRACE] updateProcessedTime: calling resolvePendingWorkflowTransitionByWorkId', { workId, hasErrors, failureReason });
       await resolvePendingWorkflowTransitionByWorkId(context, user, workId, !hasErrors, failureReason);
     }
   }
@@ -429,11 +427,65 @@ export const updateProcessedTime = async (context, user, workId, message, inErro
 };
 
 /**
- * Called by the task manager once it has finished dispatching a task's bundles.
- * Resolves any pending workflow transition that is waiting for this work_id.
+ * Scans for workflow instances stuck in 'pending' state and resolves them if their
+ * background works are complete, errored, or timed out.
+ * Called periodically by the task manager scheduler.
  */
-export const resolveWorkflowTransitionForTask = async (context, user, workId) => {
-  if (!workId) return;
-  // Intentionally no-op: workflow transitions must be resolved from work completion
-  // callbacks (reportExpectation/updateProcessedTime), not from dispatch completion.
+export const resolveStaleWorkflowTransitions = async (context, user) => {
+  const pendingInstances = [];
+  const callback = (elements) => {
+    pendingInstances.push(...elements);
+  };
+  await elList(context, user, READ_INDEX_INTERNAL_OBJECTS, {
+    types: ['WorkflowInstance'],
+    filters: {
+      mode: 'and',
+      filters: [{ key: 'pending_status', values: ['pending'] }],
+      filterGroups: [],
+    },
+    noFiltersChecking: true,
+    callback,
+  });
+
+  for (const instance of pendingInstances) {
+    const pendingWorkIds = Array.isArray(instance.pending_work_ids) ? instance.pending_work_ids : [];
+
+    // Check timeout first — applies regardless of individual work states.
+    const pendingTransitionRaw = instance.pending_transition;
+    if (pendingTransitionRaw) {
+      try {
+        const pendingTransition = typeof pendingTransitionRaw === 'string' ? JSON.parse(pendingTransitionRaw) : pendingTransitionRaw;
+        if (pendingTransition?.startedAt) {
+          const ageMinutes = sinceNowInMinutes(pendingTransition.startedAt);
+          if (ageMinutes > WORKFLOW_PENDING_TIMEOUT_MINUTES) {
+            logApp.warn('[WORKFLOW] Pending transition timed out, marking as failed', {
+              instanceId: instance.id ?? instance.internal_id,
+              ageMinutes,
+            });
+            // Fail via first pending workId; resolvePendingWorkflowTransitionByWorkId will find the instance.
+            const firstWorkId = pendingWorkIds[0];
+            if (firstWorkId) {
+              await resolvePendingWorkflowTransitionByWorkId(context, user, firstWorkId, false, `Pending transition timed out after ${Math.round(ageMinutes)} minutes.`);
+            }
+            continue;
+          }
+        }
+      } catch {
+        // Corrupt transition payload — nothing we can do here; timeout will eventually catch it.
+      }
+    }
+
+    // Check each pending work: if gone or complete-with-errors, fail it.
+    for (const workId of pendingWorkIds) {
+      const work = await loadWorkById(context, user, workId);
+      if (!work) {
+        await resolvePendingWorkflowTransitionByWorkId(context, user, workId, false, 'Background work no longer exists.');
+      } else if (work.status === 'complete' && (work.errors?.length ?? 0) > 0) {
+        const failureReason = work.errors[0]?.message || 'Background work completed with errors.';
+        await resolvePendingWorkflowTransitionByWorkId(context, user, workId, false, failureReason);
+      } else if (work.status === 'complete') {
+        await resolvePendingWorkflowTransitionByWorkId(context, user, workId, true);
+      }
+    }
+  }
 };

@@ -10,25 +10,28 @@ enum WorkflowExecutionStatus {
 }
 
 type WorkflowPendingTransition {
-        id: ID!
-        event: String!
-        fromState: String!
-        toState: String!
-        startedAt: String!
-        taskId: String
-        workId: String
-    workIds: [String!]
-    completedWorkIds: [String!]
-    asyncActions: [WorkflowPendingAsyncAction!]
+    id: ID!
+    event: String!
+    fromState: String!
+    toState: String!
+    startedAt: String!
+    asyncActions: [WorkflowPendingAsyncAction!]!
+}
+
+type WorkflowAsyncActionSummary {
+    affectedCount: Int!
+    targetType: String
+    targetIds: [String!]
+    operation: String
 }
 
 type WorkflowPendingAsyncAction {
     id: String!
     type: String!
     status: WorkflowExecutionStatus!
-    taskId: String
     workId: String
     error: String
+    summary: WorkflowAsyncActionSummary
 }
 
 type WorkflowActionConfig {

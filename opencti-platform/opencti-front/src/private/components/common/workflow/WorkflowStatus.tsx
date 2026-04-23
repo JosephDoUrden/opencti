@@ -12,7 +12,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { ArrowDropDownOutlined } from '@mui/icons-material';
+import { ArrowDropDownOutlined, CheckCircleOutlined, ErrorOutlined } from '@mui/icons-material';
 import ItemStatus from '../../../../components/ItemStatus';
 import Button from '../../../../components/common/button/Button';
 import { WorkflowStatus_data$key } from './__generated__/WorkflowStatus_data.graphql';
@@ -42,6 +42,13 @@ export const workflowStatusFragment = graphql`
           id
           type
           status
+          error
+          summary {
+            affectedCount
+            targetType
+            targetIds
+            operation
+          }
         }
       }
       currentStatus {
@@ -82,6 +89,13 @@ const workflowStatusTriggerMutation = graphql`
           id
           type
           status
+          error
+          summary {
+            affectedCount
+            targetType
+            targetIds
+            operation
+          }
         }
       }
       instance {
@@ -97,6 +111,13 @@ const workflowStatusTriggerMutation = graphql`
             id
             type
             status
+            error
+            summary {
+              affectedCount
+              targetType
+              targetIds
+              operation
+            }
           }
         }
         currentStatus {
@@ -143,6 +164,13 @@ const workflowStatusRetryMutation = graphql`
           id
           type
           status
+          error
+          summary {
+            affectedCount
+            targetType
+            targetIds
+            operation
+          }
         }
       }
       instance {
@@ -158,6 +186,13 @@ const workflowStatusRetryMutation = graphql`
             id
             type
             status
+            error
+            summary {
+              affectedCount
+              targetType
+              targetIds
+              operation
+            }
           }
         }
         currentStatus {
@@ -309,6 +344,20 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
     });
   };
 
+  const asyncActions: any[] = pendingTransition?.asyncActions ?? [];
+
+  const getActionLabel = (action: any): string => {
+    const count = action.summary?.affectedCount ?? 0;
+    const targetType = action.summary?.targetType;
+    const targetCount = action.summary?.targetIds?.length ?? 0;
+    const operation = String(action.summary?.operation ?? '').toLowerCase();
+    if (targetType === 'organization') {
+      const verb = operation === 'unshare' ? t_i18n('Unsharing') : t_i18n('Sharing');
+      return `${verb} ${count} ${t_i18n('entities with')} ${targetCount} ${t_i18n('organization(s)')}`;
+    }
+    return `${t_i18n('Processing')} ${count} ${t_i18n('entities')}`;
+  };
+
   return (
     <>
       {hasTransitions && (
@@ -321,33 +370,50 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
           {t_i18n('Workflow')}
         </Button>
       )}
-      {isPending && (
-        <Stack spacing={0.5} sx={{ mt: 0.5, mb: 0.5 }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <CircularProgress size={12} thickness={6} />
-            <Typography variant="body2" component="div" color="text.secondary">
-              {t_i18n('Workflow transition pending')}
-            </Typography>
-          </Stack>
-          <LinearProgress sx={{ height: 3, borderRadius: 4 }} />
-        </Stack>
-      )}
-      {!isPending && pendingError && (
-        <Alert
-          sx={{ mt: 1, mb: 1 }}
-          severity="error"
-          action={(
+      {(isPending || (!isPending && pendingError)) && (
+        <Stack spacing={0.75} sx={{ mt: 0.5, mb: 0.5 }}>
+          {asyncActions.length > 0 ? asyncActions.map((action: any) => (
+            <Stack key={action.id} direction="row" spacing={1} alignItems="flex-start">
+              {action.status === 'success' && (
+                <CheckCircleOutlined sx={{ fontSize: 14, mt: '2px', color: 'success.main' }} />
+              )}
+              {action.status === 'failed' && (
+                <ErrorOutlined sx={{ fontSize: 14, mt: '2px', color: 'error.main' }} />
+              )}
+              {action.status === 'pending' && (
+                <CircularProgress size={12} thickness={6} sx={{ mt: '2px', flexShrink: 0 }} />
+              )}
+              <Stack spacing={0}>
+                <Typography variant="body2" component="div" color={action.status === 'failed' ? 'error' : 'text.secondary'}>
+                  {getActionLabel(action)}
+                </Typography>
+                {action.status === 'failed' && action.error && (
+                  <Typography variant="caption" color="error">
+                    {action.error}
+                  </Typography>
+                )}
+              </Stack>
+            </Stack>
+          )) : (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <CircularProgress size={12} thickness={6} />
+              <Typography variant="body2" component="div" color="text.secondary">
+                {t_i18n('Workflow transition pending')}
+              </Typography>
+            </Stack>
+          )}
+          {isPending && <LinearProgress sx={{ height: 3, borderRadius: 4 }} />}
+          {!isPending && pendingError && (
             <Button
               variant="secondary"
+              size="small"
               disabled={approving || retrying || !pendingTransition?.event}
               onClick={handleRetryPendingTransition}
             >
               {t_i18n('Retry')}
             </Button>
           )}
-        >
-          {pendingError}
-        </Alert>
+        </Stack>
       )}
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClose}>
         {workflowInstance.allowedTransitions.map((transition) => (

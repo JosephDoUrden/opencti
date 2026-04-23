@@ -1,10 +1,12 @@
 import type { AuthContext } from '../../../types/user';
+import { loadWorkById } from '../../../domain/work';
 import {
   deleteWorkflowDefinition,
   getAllowedNextStatuses,
   getAllowedTransitions,
   getWorkflowDefinition,
   getWorkflowInstance,
+  reconcileWorkflowTransitionForEntity,
   retryPendingWorkflowTransitionActions,
   resolvePendingWorkflowTransition,
   setWorkflowDefinition,
@@ -16,9 +18,37 @@ const workflowResolvers = {
     workflowDefinition: (_: any, { entityType }: { entityType: string }, context: AuthContext) => {
       return getWorkflowDefinition(context, context.user!, entityType);
     },
-    workflowInstance: (_: any, { entityId }: { entityId: string }, context: AuthContext) => {
-      // Logic for resolving workflowInstance
-      return getWorkflowInstance(context, context.user!, entityId);
+    workflowInstance: async (_: any, { entityId }: { entityId: string }, context: AuthContext) => {
+      const instance = await getWorkflowInstance(context, context.user!, entityId);
+      if (instance?.pendingStatus === 'pending' && instance?.pendingTransition) {
+        const asyncActions = instance.pendingTransition.asyncActions ?? [];
+        const pendingActionWorkIds: string[] = asyncActions
+          .filter((a: any) => a.status === 'pending' && a.workId)
+          .map((a: any) => a.workId as string);
+
+        if (pendingActionWorkIds.length > 0) {
+          // Load all pending works in parallel, then reconcile in one pass.
+          const workResults = await Promise.all(
+            pendingActionWorkIds.map(async (wid: string) => {
+              const work = await loadWorkById(context, context.user!, wid) as any;
+              if (!work) return { workId: wid, success: false, error: 'Background work no longer exists.' };
+              if (work.status !== 'complete') return null;
+              const hasErrors = (work.errors?.length ?? 0) > 0;
+              return {
+                workId: wid,
+                success: !hasErrors,
+                error: hasErrors ? (work.errors[0]?.message || 'Background work completed with errors.') : undefined,
+              };
+            }),
+          );
+          const completedResults = workResults.filter((r): r is NonNullable<typeof r> => r !== null);
+          if (completedResults.length > 0) {
+            await reconcileWorkflowTransitionForEntity(context, context.user!, entityId, completedResults);
+            return getWorkflowInstance(context, context.user!, entityId);
+          }
+        }
+      }
+      return instance;
     },
     allowedNextStatuses: (_: any, { entityId }: { entityId: string }, context: AuthContext) => {
       return getAllowedNextStatuses(context, context.user!, entityId);

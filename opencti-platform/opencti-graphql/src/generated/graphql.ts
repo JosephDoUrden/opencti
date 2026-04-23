@@ -37547,6 +37547,14 @@ export enum WorkflowActionMode {
   Sync = 'sync'
 }
 
+export type WorkflowAsyncActionSummary = {
+  __typename?: 'WorkflowAsyncActionSummary';
+  affectedCount: Scalars['Int']['output'];
+  operation?: Maybe<Scalars['String']['output']>;
+  targetIds?: Maybe<Array<Scalars['String']['output']>>;
+  targetType?: Maybe<Scalars['String']['output']>;
+};
+
 export type WorkflowConditionConfig = {
   __typename?: 'WorkflowConditionConfig';
   field?: Maybe<Scalars['String']['output']>;
@@ -37577,23 +37585,19 @@ export type WorkflowPendingAsyncAction = {
   error?: Maybe<Scalars['String']['output']>;
   id: Scalars['String']['output'];
   status: WorkflowExecutionStatus;
-  taskId?: Maybe<Scalars['String']['output']>;
+  summary?: Maybe<WorkflowAsyncActionSummary>;
   type: Scalars['String']['output'];
   workId?: Maybe<Scalars['String']['output']>;
 };
 
 export type WorkflowPendingTransition = {
   __typename?: 'WorkflowPendingTransition';
-  asyncActions?: Maybe<Array<WorkflowPendingAsyncAction>>;
-  completedWorkIds?: Maybe<Array<Scalars['String']['output']>>;
+  asyncActions: Array<WorkflowPendingAsyncAction>;
   event: Scalars['String']['output'];
   fromState: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   startedAt: Scalars['String']['output'];
-  taskId?: Maybe<Scalars['String']['output']>;
   toState: Scalars['String']['output'];
-  workId?: Maybe<Scalars['String']['output']>;
-  workIds?: Maybe<Array<Scalars['String']['output']>>;
 };
 
 export type WorkflowSchema = {
@@ -39960,6 +39964,7 @@ export type ResolversTypes = ResolversObject<{
   WorkTracking: ResolverTypeWrapper<WorkTracking>;
   WorkflowActionConfig: ResolverTypeWrapper<WorkflowActionConfig>;
   WorkflowActionMode: WorkflowActionMode;
+  WorkflowAsyncActionSummary: ResolverTypeWrapper<WorkflowAsyncActionSummary>;
   WorkflowConditionConfig: ResolverTypeWrapper<WorkflowConditionConfig>;
   WorkflowExecutionStatus: WorkflowExecutionStatus;
   WorkflowInstance: ResolverTypeWrapper<Omit<WorkflowInstance, 'allowedTransitions' | 'currentStatus'> & { allowedTransitions: Array<ResolversTypes['WorkflowTransition']>, currentStatus?: Maybe<ResolversTypes['Status']> }>;
@@ -40919,6 +40924,7 @@ export type ResolversParentTypes = ResolversObject<{
   WorkMessage: WorkMessage;
   WorkTracking: WorkTracking;
   WorkflowActionConfig: WorkflowActionConfig;
+  WorkflowAsyncActionSummary: WorkflowAsyncActionSummary;
   WorkflowConditionConfig: WorkflowConditionConfig;
   WorkflowInstance: Omit<WorkflowInstance, 'allowedTransitions' | 'currentStatus'> & { allowedTransitions: Array<ResolversParentTypes['WorkflowTransition']>, currentStatus?: Maybe<ResolversParentTypes['Status']> };
   WorkflowPendingAsyncAction: WorkflowPendingAsyncAction;
@@ -52127,6 +52133,13 @@ export type WorkflowActionConfigResolvers<ContextType = any, ParentType extends 
   type?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
 }>;
 
+export type WorkflowAsyncActionSummaryResolvers<ContextType = any, ParentType extends ResolversParentTypes['WorkflowAsyncActionSummary'] = ResolversParentTypes['WorkflowAsyncActionSummary']> = ResolversObject<{
+  affectedCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  operation?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  targetIds?: Resolver<Maybe<Array<ResolversTypes['String']>>, ParentType, ContextType>;
+  targetType?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+}>;
+
 export type WorkflowConditionConfigResolvers<ContextType = any, ParentType extends ResolversParentTypes['WorkflowConditionConfig'] = ResolversParentTypes['WorkflowConditionConfig']> = ResolversObject<{
   field?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   operator?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -52148,22 +52161,18 @@ export type WorkflowPendingAsyncActionResolvers<ContextType = any, ParentType ex
   error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   status?: Resolver<ResolversTypes['WorkflowExecutionStatus'], ParentType, ContextType>;
-  taskId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  summary?: Resolver<Maybe<ResolversTypes['WorkflowAsyncActionSummary']>, ParentType, ContextType>;
   type?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   workId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
 }>;
 
 export type WorkflowPendingTransitionResolvers<ContextType = any, ParentType extends ResolversParentTypes['WorkflowPendingTransition'] = ResolversParentTypes['WorkflowPendingTransition']> = ResolversObject<{
-  asyncActions?: Resolver<Maybe<Array<ResolversTypes['WorkflowPendingAsyncAction']>>, ParentType, ContextType>;
-  completedWorkIds?: Resolver<Maybe<Array<ResolversTypes['String']>>, ParentType, ContextType>;
+  asyncActions?: Resolver<Array<ResolversTypes['WorkflowPendingAsyncAction']>, ParentType, ContextType>;
   event?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   fromState?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   startedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  taskId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   toState?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  workId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
-  workIds?: Resolver<Maybe<Array<ResolversTypes['String']>>, ParentType, ContextType>;
 }>;
 
 export type WorkflowSchemaResolvers<ContextType = any, ParentType extends ResolversParentTypes['WorkflowSchema'] = ResolversParentTypes['WorkflowSchema']> = ResolversObject<{
@@ -53011,6 +53020,7 @@ export type Resolvers<ContextType = any> = ResolversObject<{
   WorkMessage?: WorkMessageResolvers<ContextType>;
   WorkTracking?: WorkTrackingResolvers<ContextType>;
   WorkflowActionConfig?: WorkflowActionConfigResolvers<ContextType>;
+  WorkflowAsyncActionSummary?: WorkflowAsyncActionSummaryResolvers<ContextType>;
   WorkflowConditionConfig?: WorkflowConditionConfigResolvers<ContextType>;
   WorkflowInstance?: WorkflowInstanceResolvers<ContextType>;
   WorkflowPendingAsyncAction?: WorkflowPendingAsyncActionResolvers<ContextType>;

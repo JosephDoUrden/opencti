@@ -14,6 +14,13 @@ export type WorkflowExecutionStatus = 'success' | 'pending' | 'failed';
 
 export type WorkflowPendingAsyncActionStatus = 'pending' | 'success' | 'failed';
 
+export interface WorkflowAsyncActionSummary {
+  affectedCount: number;
+  targetType?: string;
+  targetIds?: string[];
+  operation?: string;
+}
+
 export interface WorkflowPendingAsyncAction {
   id: string;
   type: string;
@@ -22,6 +29,7 @@ export interface WorkflowPendingAsyncAction {
   taskId?: string;
   workId?: string;
   error?: string;
+  summary?: WorkflowAsyncActionSummary;
 }
 
 export interface WorkflowPendingTransition {
@@ -30,16 +38,13 @@ export interface WorkflowPendingTransition {
   fromState: string;
   toState: string;
   startedAt: string;
-  taskId?: string;
-  workId?: string;
-  workIds?: string[];
-  completedWorkIds?: string[];
-  asyncActions?: WorkflowPendingAsyncAction[];
+  asyncActions: WorkflowPendingAsyncAction[];
 }
 
 export interface AsyncActionResult {
   taskId?: string;
   workId?: string;
+  summary?: WorkflowAsyncActionSummary;
 }
 
 /**
