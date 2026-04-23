@@ -32,13 +32,23 @@ export interface WorkflowPendingAsyncAction {
   summary?: WorkflowAsyncActionSummary;
 }
 
+export interface WorkflowTransitionPhase {
+  /** Sync action definitions to run at the start of this phase, before the async dispatch. */
+  syncActionDefs: Array<{ type: string; params?: any }>;
+  /** The async action to dispatch in this phase. Absent on a trailing sync-only phase. */
+  asyncActionDef?: { type: string; params?: any };
+  /** Populated once this phase's async action has been dispatched. */
+  asyncAction?: WorkflowPendingAsyncAction;
+}
+
 export interface WorkflowPendingTransition {
   id: string;
   event: string;
   fromState: string;
   toState: string;
   startedAt: string;
-  asyncActions: WorkflowPendingAsyncAction[];
+  phases: WorkflowTransitionPhase[];
+  currentPhaseIndex: number;
 }
 
 export interface AsyncActionResult {
