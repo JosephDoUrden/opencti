@@ -8,6 +8,8 @@ import {
   listDraftSightingRelations,
   validateDraftWorkspace,
 } from '../../draftWorkspace/draftWorkspace-domain';
+import { createWork, reportExpectation, updateExpectationsNumber } from '../../../domain/work';
+import { DRAFT_VALIDATION_CONNECTOR } from '../../draftWorkspace/draftWorkspace-connector';
 import type { AsyncActionResult, Context } from '../types/workflow-types';
 
 export type ActionFunction<TContext extends Context = Context> = (ctx: TContext, params?: any) => Promise<void | AsyncActionResult> | void | AsyncActionResult;
@@ -39,6 +41,23 @@ export const ActionRegistry: Record<string, ActionFunction> = {
   // actions examples:
   log: async (ctx, params) => {
     logApp.info(`[Action: LOG] Context: ${JSON.stringify(ctx)} | Message: ${params?.message || 'No message'}`);
+  },
+  fail: async (_ctx, params) => {
+    throw new Error(params?.message || 'Workflow action failed (test)');
+  },
+  failAsync: async (ctx, params) => {
+    // Creates a real work entry and immediately marks it as failed — no worker needed.
+    // Use mode: "async" in the transition definition to test the full async error path.
+    const { entity, user, context } = ctx;
+    const entityId = entity.internal_id || entity.id;
+    const work = await createWork(context, user, DRAFT_VALIDATION_CONNECTOR, '[DEV] Async fail test', entityId);
+    if (!work) throw new Error('failAsync: could not create work entry');
+    await updateExpectationsNumber(context, user, work.id, 1);
+    await reportExpectation(context, user, work.id, {
+      error: params?.message || 'Async workflow action failed (test)',
+      source: 'failAsync action',
+    });
+    return { workId: work.id };
   },
   validateDraft: async (ctx) => {
     const { entity, user, context } = ctx;

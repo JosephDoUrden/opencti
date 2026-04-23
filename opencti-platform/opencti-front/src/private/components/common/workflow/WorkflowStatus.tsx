@@ -10,6 +10,7 @@ import {
   Menu,
   MenuItem,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { ArrowDropDownOutlined, CheckCircleOutlined, ErrorOutlined } from '@mui/icons-material';
@@ -290,8 +291,13 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
           entityId: draft.id,
           eventName,
         },
-        onCompleted: () => {
+        onCompleted: (response) => {
           handleClose();
+          const result = (response as any).triggerWorkflowEvent;
+          if (result && !result.success && result.executionStatus !== 'pending' && !result.instance) {
+            // Only fall back to toast if the instance wasn't updated (no bottom bar to show)
+            MESSAGING$.notifyError(result.reason || t_i18n('Workflow transition failed'));
+          }
         },
       });
     }
@@ -372,47 +378,76 @@ export const WorkflowTransitions: FunctionComponent<WorkflowTransitionsProps> = 
       )}
       {(isPending || (!isPending && pendingError)) && (
         <Stack spacing={0.75} sx={{ mt: 0.5, mb: 0.5 }}>
-          {asyncActions.length > 0 ? asyncActions.map((action: any) => (
-            <Stack key={action.id} direction="row" spacing={1} alignItems="flex-start">
-              {action.status === 'success' && (
-                <CheckCircleOutlined sx={{ fontSize: 14, mt: '2px', color: 'success.main' }} />
+          <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+            <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0 }}>
+              {asyncActions.length > 0 ? asyncActions.map((action: any) => (
+                <Stack key={action.id} direction="row" spacing={1} alignItems="center">
+                  {action.status === 'success' && (
+                    <CheckCircleOutlined sx={{ fontSize: 14, color: 'success.main' }} />
+                  )}
+                  {action.status === 'failed' && (
+                    <ErrorOutlined sx={{ fontSize: 14, color: 'error.main' }} />
+                  )}
+                  {action.status === 'pending' && (
+                    <CircularProgress size={12} thickness={6} sx={{ flexShrink: 0 }} />
+                  )}
+                  <Stack spacing={0} sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" component="div" color={action.status === 'failed' ? 'error' : 'text.secondary'}>
+                      {getActionLabel(action)}
+                    </Typography>
+                    {action.status === 'failed' && action.error && (
+                      <Tooltip title={action.error} placement="bottom-start">
+                        <Typography
+                          variant="caption"
+                          color="error"
+                          sx={{ display: 'block', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'default' }}
+                        >
+                          {action.error}
+                        </Typography>
+                      </Tooltip>
+                    )}
+                  </Stack>
+                </Stack>
+              )) : (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {isPending ? (
+                    <>
+                      <CircularProgress size={12} thickness={6} sx={{ flexShrink: 0 }} />
+                      <Typography variant="body2" component="div" color="text.secondary">
+                        {t_i18n('Workflow transition pending')}
+                      </Typography>
+                    </>
+                  ) : (
+                    <>
+                      <ErrorOutlined sx={{ fontSize: 14, color: 'error.main' }} />
+                      <Tooltip title={pendingError ?? ''} placement="bottom-start">
+                        <Typography
+                          variant="body2"
+                          component="div"
+                          color="error"
+                          sx={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'default' }}
+                        >
+                          {pendingError}
+                        </Typography>
+                      </Tooltip>
+                    </>
+                  )}
+                </Stack>
               )}
-              {action.status === 'failed' && (
-                <ErrorOutlined sx={{ fontSize: 14, mt: '2px', color: 'error.main' }} />
-              )}
-              {action.status === 'pending' && (
-                <CircularProgress size={12} thickness={6} sx={{ mt: '2px', flexShrink: 0 }} />
-              )}
-              <Stack spacing={0}>
-                <Typography variant="body2" component="div" color={action.status === 'failed' ? 'error' : 'text.secondary'}>
-                  {getActionLabel(action)}
-                </Typography>
-                {action.status === 'failed' && action.error && (
-                  <Typography variant="caption" color="error">
-                    {action.error}
-                  </Typography>
-                )}
-              </Stack>
             </Stack>
-          )) : (
-            <Stack direction="row" spacing={1} alignItems="center">
-              <CircularProgress size={12} thickness={6} />
-              <Typography variant="body2" component="div" color="text.secondary">
-                {t_i18n('Workflow transition pending')}
-              </Typography>
-            </Stack>
-          )}
+            {!isPending && pendingError && (
+              <Button
+                variant="secondary"
+                size="small"
+                disabled={approving || retrying || !pendingTransition?.event}
+                onClick={handleRetryPendingTransition}
+                sx={{ flexShrink: 0 }}
+              >
+                {t_i18n('Retry')}
+              </Button>
+            )}
+          </Stack>
           {isPending && <LinearProgress sx={{ height: 3, borderRadius: 4 }} />}
-          {!isPending && pendingError && (
-            <Button
-              variant="secondary"
-              size="small"
-              disabled={approving || retrying || !pendingTransition?.event}
-              onClick={handleRetryPendingTransition}
-            >
-              {t_i18n('Retry')}
-            </Button>
-          )}
         </Stack>
       )}
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClose}>

@@ -1,5 +1,4 @@
 import { FunctionalError } from '../../../config/errors';
-import { logApp } from '../../../config/conf';
 import { createEntity, createRelation, loadEntity, updateAttribute } from '../../../database/middleware';
 import { storeLoadById } from '../../../database/middleware-loader';
 import { FilterMode } from '../../../generated/graphql';
@@ -536,6 +535,17 @@ export const triggerWorkflowEvent = async (
       };
     }
 
+    // Sync-only transition: store the transition info so failures can be shown and retried.
+    const syncFailTransition: WorkflowPendingTransition = {
+      id: `${eventName}-${Date.now()}`,
+      event: eventName,
+      fromState: transition.from,
+      toState: transition.to,
+      startedAt: new Date().toISOString(),
+      phases: [],
+      currentPhaseIndex: 0,
+    };
+
     // 5. Create instance and Trigger the event
     const instance = WorkflowFactory.getInstance(definitionData, definition, currentStateId || '', workflowContext);
     const result = await instance.trigger(eventName);
@@ -566,12 +576,52 @@ export const triggerWorkflowEvent = async (
       return { success: true, executionStatus: 'success', newState, instance: workflowInstance, entity };
     }
 
+    // Sync trigger returned failure (non-throw path) — persist it
+    if (!result.success && instanceEntity) {
+      const instanceId = instanceEntity.internal_id || instanceEntity.id;
+      await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+        { key: 'pending_status', value: ['failed'] },
+        { key: 'pending_transition', value: [JSON.stringify(syncFailTransition)] },
+        { key: 'pending_error', value: [result.reason || 'Workflow transition failed'] },
+      ]);
+      const workflowInstance = await getWorkflowInstance(executionContext, executionUser, entityId);
+      return { ...result, executionStatus: 'failed', instance: workflowInstance, entity };
+    }
+
     return { ...result, entity };
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'Unknown error';
+    // Persist the failure on the instance so it shows up in the bottom bar with a Retry button.
+    // Best-effort: if we can't persist, still return the error to the caller.
+    try {
+      const effectiveEntityId = entity.internal_id || entity.id;
+      const instanceEntity = await findWorkflowInstanceEntity(executionContext, executionUser, effectiveEntityId);
+      if (instanceEntity) {
+        const failTransition: WorkflowPendingTransition = {
+          id: `${eventName}-${Date.now()}`,
+          event: eventName,
+          fromState: instanceEntity.currentState || '',
+          toState: instanceEntity.currentState || '', // State didn't change; same as fromState
+          startedAt: new Date().toISOString(),
+          phases: [],
+          currentPhaseIndex: 0,
+        };
+        const instanceId = instanceEntity.internal_id || instanceEntity.id;
+        await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+          { key: 'pending_status', value: ['failed'] },
+          { key: 'pending_transition', value: [JSON.stringify(failTransition)] },
+          { key: 'pending_error', value: [reason] },
+        ]);
+        const workflowInstance = await getWorkflowInstance(executionContext, executionUser, entityId);
+        return { success: false, executionStatus: 'failed', reason, instance: workflowInstance, entity };
+      }
+    } catch {
+      // Ignore persistence error — fall through to plain error response
+    }
     return {
       success: false,
-      reason: `Workflow execution failed: ${reason}`,
+      executionStatus: 'failed',
+      reason,
     };
   }
 };
@@ -843,7 +893,19 @@ export const retryPendingWorkflowTransitionActions = async (
   const currentPhase = phases[currentPhaseIndex];
   const asyncAction = currentPhase?.asyncAction;
 
-  if (!asyncAction || asyncAction.status !== 'failed') {
+  // Sync-only failure (no async phases) — clear the error state and re-trigger the event from scratch
+  if (!asyncAction) {
+    const instanceId = instanceEntity.internal_id || instanceEntity.id;
+    await updateAttribute(executionContext, executionUser, instanceId, ENTITY_TYPE_WORKFLOW_INSTANCE, [
+      { key: 'pending_status', value: [null] },
+      { key: 'pending_work_ids', value: [] },
+      { key: 'pending_transition', value: [null] },
+      { key: 'pending_error', value: [null] },
+    ]);
+    return triggerWorkflowEvent(context, user, entityId, pendingTransition.event);
+  }
+
+  if (asyncAction.status !== 'failed') {
     return {
       success: false,
       executionStatus: 'failed',

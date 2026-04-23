@@ -50,6 +50,8 @@ export enum WorkflowActionType {
   asyncListTask = 'asyncListTask',
   shareToOrganization = 'shareToOrganization',
   unshareFromOrganization = 'unshareFromOrganization',
+  fail = 'fail',
+  failAsync = 'failAsync',
 }
 
 export const NODE_SIZE = { width: 160, height: 50 };
@@ -68,6 +70,20 @@ const formatActions = (actions: Action[] = []) => {
       return {
         type,
         mode,
+      };
+    }
+    if (type === 'fail') {
+      return {
+        type,
+        mode,
+        params: params ?? {},
+      };
+    }
+    if (type === 'failAsync') {
+      return {
+        type,
+        mode: 'async',
+        params: params ?? {},
       };
     }
     if (type === 'backgroundListTask' || type === 'asyncListTask') {

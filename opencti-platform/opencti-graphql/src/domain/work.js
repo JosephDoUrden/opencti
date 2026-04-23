@@ -20,6 +20,22 @@ import { logApp } from '../config/conf';
 import { internalLoadById } from '../database/middleware-loader';
 import { resolvePendingWorkflowTransitionByWorkId } from '../modules/workflow/domain/workflow-domain';
 
+/**
+ * Extracts a short, human-readable message from a raw worker error string.
+ * Worker errors can be full JSON blobs with stacktraces — only the first
+ * meaningful sentence is kept so the workflow status bar stays readable.
+ */
+const extractWorkflowErrorMessage = (raw) => {
+  if (!raw) return 'Background work failed';
+  try {
+    const parsed = JSON.parse(raw);
+    const message = parsed?.errors?.[0]?.message ?? parsed?.message ?? raw;
+    return String(message).split('\n')[0].substring(0, 200);
+  } catch {
+    return String(raw).split('\n')[0].substring(0, 200);
+  }
+};
+
 export const workToExportFile = (work) => {
   const lastModifiedSinceMin = sinceNowInMinutes(work.updated_at);
   const isWorkActive = lastModifiedSinceMin < 20; // Timeout if no activity during 20 minutes
@@ -309,7 +325,8 @@ export const reportExpectation = async (context, user, workId, errorData) => {
         await updateWorkTaskToComplete(context, user, currentWork);
         const finalizedWork = await loadWorkById(context, user, workId);
         const hasErrors = (finalizedWork?.errors?.length ?? 0) > 0;
-        const failureReason = hasErrors ? (finalizedWork?.errors?.[0]?.message || 'Background work failed') : undefined;
+        const rawReason = hasErrors ? (finalizedWork?.errors?.[0]?.message || 'Background work failed') : undefined;
+        const failureReason = rawReason ? extractWorkflowErrorMessage(rawReason) : undefined;
         await resolvePendingWorkflowTransitionByWorkId(context, user, workId, !hasErrors, failureReason);
       }
     } else {
