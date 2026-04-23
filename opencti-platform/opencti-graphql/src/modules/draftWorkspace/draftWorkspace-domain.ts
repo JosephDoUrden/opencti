@@ -90,7 +90,7 @@ export const getObjectsCount = async (context: AuthContext, user: AuthUser, draf
 
   const allDraftEntities = await elList(draftContext, user, READ_INDEX_DRAFT_OBJECTS, { includeDeletedInDraft: true });
   const reviewsCount = allDraftEntities.filter(
-    (e: BasicStoreCommon) => e.draft_change?.draft_operation === DRAFT_OPERATION_UPDATE,
+    (e) => (e as BasicStoreCommon).draft_change?.draft_operation === DRAFT_OPERATION_UPDATE,
   ).length;
 
   // TODO fix total to include only stix domain objects & SCO & stix core relationships & sightings & stix domain objects
