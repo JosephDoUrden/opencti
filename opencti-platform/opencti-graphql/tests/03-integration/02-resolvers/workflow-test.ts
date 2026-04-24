@@ -97,7 +97,7 @@ describe('Workflow Resolver', () => {
       from: 'open',
       to: 'validated',
       event: 'validate_event',
-      actions: [{ type: 'validateDraft' }],
+      actions: [{ type: 'validateDraft', mode: 'sync' }],
     }],
   });
 
