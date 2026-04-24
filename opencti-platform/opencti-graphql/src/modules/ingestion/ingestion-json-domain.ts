@@ -34,6 +34,7 @@ import jsonMappingExecution from '../../parser/json-mapper';
 import type { StixObject } from '../../types/stix-2-1-common';
 import { getEntitiesMapFromCache } from '../../database/cache';
 import { ENTITY_TYPE_CONNECTOR, ENTITY_TYPE_USER } from '../../schema/internalObject';
+import { encryptDatabaseValue, decryptDatabaseValue } from '../../utils/platformCrypto';
 
 interface JsonQueryFetchOpts {
   maxResults?: number;
@@ -106,16 +107,17 @@ export const executeJsonQuery = async (context: AuthContext, ingestion: BasicSto
   Object.entries(headerVariables).forEach(([k, v]) => {
     headers[k] = String(v);
   });
+  const decryptedAuthValue = await decryptDatabaseValue(ingestion.authentication_value);
   if (ingestion.authentication_type === IngestionAuthType.Basic) {
-    const basicAuthenticationValue = ingestion.authentication_value as string;
+    const basicAuthenticationValue = decryptedAuthValue as string;
     const auth = Buffer.from(basicAuthenticationValue, 'utf-8').toString('base64');
     headers.Authorization = `Basic ${auth}`;
   }
   if (ingestion.authentication_type === IngestionAuthType.Bearer) {
-    headers.Authorization = `Bearer ${ingestion.authentication_value}`;
+    headers.Authorization = `Bearer ${decryptedAuthValue}`;
   }
   if (ingestion.authentication_type === IngestionAuthType.Certificate) {
-    const certificateAuthenticationValue = ingestion.authentication_value as string;
+    const certificateAuthenticationValue = decryptedAuthValue as string;
     certificates = {
       cert: certificateAuthenticationValue.split(':')[0],
       key: certificateAuthenticationValue.split(':')[1],
@@ -178,8 +180,9 @@ export const executeJsonQuery = async (context: AuthContext, ingestion: BasicSto
 export const findById = async (context: AuthContext, user: AuthUser, ingestionId: string, removeCredentials = false) => {
   const jsonIngestion = await storeLoadById<BasicStoreEntityIngestionJson>(context, user, ingestionId, ENTITY_TYPE_INGESTION_JSON);
 
-  if (removeCredentials) {
-    jsonIngestion.authentication_value = removeAuthenticationCredentials(jsonIngestion.authentication_type, jsonIngestion.authentication_value) || '';
+  if (jsonIngestion && removeCredentials) {
+    const decryptedAuthValue = await decryptDatabaseValue(jsonIngestion.authentication_value);
+    jsonIngestion.authentication_value = removeAuthenticationCredentials(jsonIngestion.authentication_type, decryptedAuthValue) || '';
   }
   return jsonIngestion;
 };
@@ -214,7 +217,11 @@ export const addIngestionJson = async (context: AuthContext, user: AuthUser, inp
   if (input.authentication_value) {
     verifyIngestionAuthenticationContent(input.authentication_type, input.authentication_value);
   }
-  const { element, isCreation } = await createEntity(context, user, input, ENTITY_TYPE_INGESTION_JSON, { complete: true });
+  const inputToCreate = { ...input };
+  if (inputToCreate.authentication_value) {
+    inputToCreate.authentication_value = await encryptDatabaseValue(inputToCreate.authentication_value);
+  }
+  const { element, isCreation } = await createEntity(context, user, inputToCreate, ENTITY_TYPE_INGESTION_JSON, { complete: true });
   if (isCreation) {
     await registerConnectorForIngestion(context, {
       id: element.id,
@@ -238,7 +245,8 @@ export const addIngestionJson = async (context: AuthContext, user: AuthUser, inp
 export const editIngestionJson = async (context: AuthContext, user: AuthUser, id: string, input: IngestionJsonAddInput) => {
   let authenticationValue = input.authentication_value;
   if (authenticationValue && input.authentication_type) {
-    const { authentication_value } = await findById(context, user, id);
+    const { authentication_value: encrypted_value } = await findById(context, user, id);
+    const authentication_value = await decryptDatabaseValue(encrypted_value);
     verifyIngestionAuthenticationContent(input.authentication_type, authenticationValue);
     authenticationValue = addAuthenticationCredentials(
       authentication_value,
@@ -246,10 +254,11 @@ export const editIngestionJson = async (context: AuthContext, user: AuthUser, id
       input.authentication_type,
     );
   }
+  const encryptedAuthenticationValue = await encryptDatabaseValue(authenticationValue);
 
   const { element } = await patchAttribute<StoreEntityIngestionJson>(context, user, id, ENTITY_TYPE_INGESTION_JSON, {
     ...input,
-    authentication_value: authenticationValue,
+    authentication_value: encryptedAuthenticationValue,
   });
   return {
     ...element,
@@ -261,7 +270,8 @@ export const ingestionJsonEditField = async (context: AuthContext, user: AuthUse
   const patchInput = [...input];
 
   if (input.some((editInput) => editInput.key === 'authentication_value')) {
-    const { authentication_value, authentication_type } = await findById(context, user, ingestionId);
+    const { authentication_value: encrypted_value, authentication_type } = await findById(context, user, ingestionId);
+    const authentication_value = await decryptDatabaseValue(encrypted_value);
     const authenticationValueField = input.find((editInput) => editInput.key === 'authentication_value');
     if (authenticationValueField?.value[0]) {
       verifyIngestionAuthenticationContent(authentication_type, authenticationValueField?.value[0]);
@@ -271,12 +281,13 @@ export const ingestionJsonEditField = async (context: AuthContext, user: AuthUse
       authenticationValueField?.value[0],
       authentication_type,
     );
+    const encryptedAuthenticationValue = await encryptDatabaseValue(updatedAuthenticationValue);
 
     const updatedInput = patchInput.map((editInput) => {
       if (editInput.key === 'authentication_value') {
         return {
           ...editInput,
-          value: [updatedAuthenticationValue],
+          value: [encryptedAuthenticationValue],
         };
       }
       return editInput;
@@ -312,9 +323,10 @@ export const ingestionJsonEditField = async (context: AuthContext, user: AuthUse
   });
 
   const notif = await notify(BUS_TOPICS[ABSTRACT_INTERNAL_OBJECT].EDIT_TOPIC, element, user);
+  const decryptedNotifAuthValue = await decryptDatabaseValue(notif.authentication_value);
   return {
     ...notif,
-    authentication_value: removeAuthenticationCredentials(notif.authentication_type, notif.authentication_value),
+    authentication_value: removeAuthenticationCredentials(notif.authentication_type, decryptedNotifAuthValue),
   };
 };
 

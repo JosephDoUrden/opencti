@@ -8,6 +8,7 @@ import { ABSTRACT_INTERNAL_OBJECT } from '../../schema/general';
 import type { AuthContext, AuthUser } from '../../types/user';
 import { type EditInput, type IngestionTaxiiAddAutoUserInput, type IngestionTaxiiAddInput } from '../../generated/graphql';
 import { addAuthenticationCredentials, removeAuthenticationCredentials, verifyIngestionAuthenticationContent } from './ingestion-common';
+import { encryptDatabaseValue, decryptDatabaseValue } from '../../utils/platformCrypto';
 import { registerConnectorForIngestion, unregisterConnectorForIngestion } from '../../domain/connector';
 import { createOnTheFlyUser } from '../user/user-domain';
 import type { FileHandle } from 'fs/promises';
@@ -18,8 +19,9 @@ const MINIMAL_TAXII_FEED_COMPATIBLE_VERSION = '6.9.4';
 
 export const findById = async (context: AuthContext, user: AuthUser, ingestionId: string, removeCredentials = false) => {
   const taxiiIngestion = await storeLoadById<BasicStoreEntityIngestionTaxii>(context, user, ingestionId, ENTITY_TYPE_INGESTION_TAXII);
-  if (removeCredentials) {
-    taxiiIngestion.authentication_value = removeAuthenticationCredentials(taxiiIngestion.authentication_type, taxiiIngestion.authentication_value) || '';
+  if (taxiiIngestion && removeCredentials) {
+    const decryptedAuthValue = await decryptDatabaseValue(taxiiIngestion.authentication_value);
+    taxiiIngestion.authentication_value = removeAuthenticationCredentials(taxiiIngestion.authentication_type, decryptedAuthValue) || '';
   }
   return taxiiIngestion;
 };
@@ -46,6 +48,9 @@ export const addIngestion = async (context: AuthContext, user: AuthUser, input: 
   }
 
   const { automatic_user: _automatic_user, confidence_level: _confidence_level, ...taxiiFeedToCreate } = input;
+  if (taxiiFeedToCreate.authentication_value) {
+    taxiiFeedToCreate.authentication_value = await encryptDatabaseValue(taxiiFeedToCreate.authentication_value);
+  }
   const { element, isCreation } = await createEntity(context, user, taxiiFeedToCreate, ENTITY_TYPE_INGESTION_TAXII, { complete: true });
   if (isCreation) {
     await registerConnectorForIngestion(context, {
@@ -86,7 +91,8 @@ export const ingestionEditField = async (context: AuthContext, user: AuthUser, i
   const patchInput = [...input];
 
   if (input.some((editInput) => editInput.key === 'authentication_value')) {
-    const { authentication_value, authentication_type } = await findById(context, user, ingestionId);
+    const { authentication_value: encrypted_value, authentication_type } = await findById(context, user, ingestionId);
+    const authentication_value = await decryptDatabaseValue(encrypted_value);
     const authenticationValueField = input.find((editInput) => editInput.key === 'authentication_value');
     if (authenticationValueField?.value[0]) {
       verifyIngestionAuthenticationContent(authentication_type, authenticationValueField?.value[0]);
@@ -96,12 +102,13 @@ export const ingestionEditField = async (context: AuthContext, user: AuthUser, i
       authenticationValueField?.value[0],
       authentication_type,
     );
+    const encryptedAuthenticationValue = await encryptDatabaseValue(updatedAuthenticationValue);
 
     const updatedInput = patchInput.map((editInput) => {
       if (editInput.key === 'authentication_value') {
         return {
           ...editInput,
-          value: [updatedAuthenticationValue],
+          value: [encryptedAuthenticationValue],
         };
       }
       return editInput;
@@ -146,9 +153,10 @@ export const ingestionEditField = async (context: AuthContext, user: AuthUser, i
   });
 
   const notif = await notify(BUS_TOPICS[ABSTRACT_INTERNAL_OBJECT].EDIT_TOPIC, element, user);
+  const decryptedNotifAuthValue = await decryptDatabaseValue(notif.authentication_value);
   return {
     ...notif,
-    authentication_value: removeAuthenticationCredentials(notif.authentication_type, notif.authentication_value),
+    authentication_value: removeAuthenticationCredentials(notif.authentication_type, decryptedNotifAuthValue),
   };
 };
 

@@ -64,9 +64,9 @@ import { addDraftWorkspace } from '../modules/draftWorkspace/draftWorkspace-doma
 import type { Work } from '../types/work';
 import { AxiosError } from 'axios';
 import { URL } from 'node:url';
-import { isCompatibleVersionWithMinimal } from '../utils/version';
 import { extractContentFrom } from '../utils/fileToContent';
 import type { FileHandle } from 'fs/promises';
+import { encryptDatabaseValue, decryptDatabaseValue } from '../utils/platformCrypto';
 
 const MINIMAL_SYNCHRONIZER_COMPATIBLE_VERSION = '6.9.6';
 // Sanitize name for K8s/Docker
@@ -529,8 +529,9 @@ export const patchSync = async (context: AuthContext, user: AuthUser, id: string
 };
 export const findSyncById = async (context: AuthContext, user: AuthUser, syncId: string, removeCredentials = false) => {
   const basicIngestion = await storeLoadById<BasicStoreEntitySynchronizer>(context, user, syncId, ENTITY_TYPE_SYNC);
-  if (removeCredentials) {
-    basicIngestion.token = removeAuthenticationCredentials(IngestionAuthType.Bearer, basicIngestion.token) ?? null;
+  if (basicIngestion && removeCredentials) {
+    const decryptedToken = await decryptDatabaseValue(basicIngestion.token);
+    basicIngestion.token = removeAuthenticationCredentials(IngestionAuthType.Bearer, decryptedToken) ?? null;
   }
   return basicIngestion;
 };
@@ -616,6 +617,10 @@ export const registerSync = async (
 
   await testSyncUtils(context, user, synchronizerToCreate);
 
+  if (synchronizerToCreate.token) {
+    synchronizerToCreate.token = await encryptDatabaseValue(synchronizerToCreate.token);
+  }
+
   const { element, isCreation } = await createEntity(
     context,
     user,
@@ -673,6 +678,10 @@ export const synchronizerAddAutoUser = async (context: AuthContext, user: AuthUs
 };
 
 export const syncEditField = async (context: AuthContext, user: AuthUser, syncId: string, input: EditInput[]) => {
+  const tokenInput = input.find((i) => i.key === 'token');
+  if (tokenInput && tokenInput.value[0]) {
+    tokenInput.value[0] = await encryptDatabaseValue(tokenInput.value[0]);
+  }
   const { element } = await updateAttribute<StoreEntity>(context, user, syncId, ENTITY_TYPE_SYNC, input);
   await publishUserAction({
     user,
